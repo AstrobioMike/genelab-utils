@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+version='1.0.00'
+
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+printf "\n\t\t\tGeneLab utils ${GREEN}v${version}${NC}\n"
+printf "\t\tgithub.com/AstrobioMike/GeneLab-utils\n\n"
+
+today=$(date +'%A')
+
+printf "                                                   ${GREEN}Happy $today :)${NC}\n\n"

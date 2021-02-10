@@ -1,0 +1,190 @@
+#!/usr/bin/env python
+
+"""
+This is a program for generating the README.txt file for GeneLab amplicon processed datasets.
+"""
+
+import os
+import sys
+import argparse
+import textwrap
+import tarfile
+
+
+parser = argparse.ArgumentParser(description="This program generates the corresponding README file for GeneLab amplicon processed datasets. \
+                                             Hard-coded variables that may need to be changed are at the top \
+                                             of the script. It is expected to be run after `GL-validate-amplicon` has\
+                                             been run successfully.")
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store")
+parser.add_argument("--output", help='Name of output file (default: "README.txt")', default="README.txt")
+parser.add_argument("--name", help='Name of individual who performed the processing (default: "Michael D. Lee")', default="Michael D. Lee")
+parser.add_argument("--email", help='Email address of individual who performed the processing (default: "Mike.Lee@nasa.gov")', default="Mike.Lee@nasa.gov")
+parser.add_argument("--protocol-ID", help='Protocol document ID followed (default: "GL-DPPD-7104-A")', default="GL-DPPD-7104-A")
+parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
+                    therefore there are no trimmed sequence data.", action="store_true")
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+
+### hard-coded stuff we might want to change ###
+raw_reads_dir = "Raw_Data/"
+fastqc_dir = "FastQC_Outputs/"
+trimmed_reads_dir = "Trimmed_Sequence_Data/"
+filtered_reads_dir = "Filtered_Sequence_Data/"
+final_outputs_dir = "Final_Outputs/"
+
+raw_suffix = "_raw.fastq.gz"
+raw_R1_suffix = "_R1_raw.fastq.gz"
+raw_R2_suffix = "_R2_raw.fastq.gz"
+primer_trimmed_suffix = "_trimmed.fastq.gz"
+primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
+primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
+filtered_suffix = "_filtered.fastq.gz"
+filtered_R1_suffix = "-R1-filtered.fastq.gz"
+filtered_R2_suffix = "-R2-filtered.fastq.gz"
+
+processing_tar_file = "processing_info.tar"
+
+expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
+
+################################################################################
+
+def main():
+
+    check_expected_directories()
+
+    processing_tar_contents = get_processing_tar_contents()
+
+    with open(args.output, "w") as output:
+
+        write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
+
+        write_body(output, processing_tar_contents)
+
+################################################################################
+
+def write_header(output, GLDS_ID, name, email, protocol_ID):
+
+    header = ["################################################################################\n",
+              "{:<77} {:>0}".format("## This directory holds processed data for NASA " + str(GLDS_ID), "##\n"),
+              "{:<77} {:>0}".format("## https://genelab-data.ndc.nasa.gov/genelab/accession/" + str(GLDS_ID) + "/", "##\n"),
+              "{:<77} {:>0}".format("##", "##\n"),
+              "{:<77} {:>0}".format("## Processed by " + str(name) + " (" + str(email) + ")", "##\n"),
+              "{:<77} {:>0}".format("## Based on " + str(protocol_ID),  "##\n"),
+              "################################################################################\n\n",
+              "Summary of contents:\n\n"]
+
+    output.writelines(header)
+
+
+def write_body(output, processing_tar_contents):
+
+    # this file
+    output.write("    {:<41} {:>0}".format("- " + str(args.output), "- this file\n\n"))
+
+    # fastqc info
+    output.write("    {:<41} {:>0}".format("- " + str(fastqc_dir), "- multiQC summary reports of FastQC runs\n\n"))
+
+    # raw reads
+    output.write("    {:<41} {:>0}".format("- " + str(raw_reads_dir), "- initial read fastq files\n\n"))
+
+    # primer-trimmed reads if there are any
+    if not args.primers_already_trimmed:
+        output.write("    {:<41} {:>0}".format("- " + str(trimmed_reads_dir), "- primer-trimmed fastq files\n\n"))
+
+    # quality-filtered reads
+    output.write("    {:<41} {:>0}".format("- " + str(filtered_reads_dir), "- quality-filtered fastq files\n\n"))
+
+    # outputs
+    output.write("    {:<41} {:>0}".format("- " + str(final_outputs_dir), "- primary output files (may or may not have additional prefix)\n"))
+    output.write("        {:<37} {:>0}".format("- *.fasta", "- fasta file of recovered sequences\n"))
+    output.write("        {:<37} {:>0}".format("- counts.tsv", "- count table of sequences across samples\n"))
+    output.write("        {:<37} {:>0}".format("- taxonomy.tsv", "- assigned taxonomy of recovered sequences\n"))
+    output.write("        {:<37} {:>0}".format("- taxonomy-and-count.tsv", "- combined table of counts and taxonomy\n"))
+    output.write("        {:<37} {:>0}".format("- taxonomy-and-count.biom.zip", "- biom-formatted output of counts and taxonomy\n"))
+    output.write("        {:<37} {:>0}".format("- read-count-tracking.tsv", "- read counts at each processing step\n\n"))
+    
+    # processing info
+    output.write("    {:<41} {:>0}".format("- " + str(processing_tar_file), "- tarball holding info related to processing\n"))
+    for item in processing_tar_contents:
+        output.write("        - " + str(item) + "\n")
+
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    """ print wrapper """
+
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def report_failure(message, color = "yellow"):
+    print("")
+    wprint(color_text(message, color))
+    print("\nREADME generation failed.\n")
+    sys.exit(1)
+
+
+def check_expected_directories():
+    """ checks expected directories exist """
+
+    if not args.primers_already_trimmed:
+
+        expected_dirs = [raw_reads_dir, fastqc_dir, trimmed_reads_dir, filtered_reads_dir, final_outputs_dir]
+
+    else:
+
+        expected_dirs = [raw_reads_dir, fastqc_dir, filtered_reads_dir, final_outputs_dir]
+
+    for directory in expected_dirs:
+        if not os.path.isdir(directory):
+
+            report_failure("The directory '" + str(directory) + "' was expected but not found.")
+
+
+def check_for_file_and_contents(file_path):
+    """ used by check_fastq_files function """
+
+    if not os.path.exists(file_path):
+        report_failure("The expected file '" + str(file_path) + "' does not exist.")
+    if not os.path.getsize(file_path) > 0:
+        report_failure("The file '" + str(file_path) + "' is empty.")
+
+
+def get_processing_tar_contents():
+    """ this just makes sure a processing tar exists and at least has the Snakefile, as its contents can vary quite a bit """
+
+    check_for_file_and_contents(processing_tar_file)
+
+    with tarfile.open(processing_tar_file) as tar_obj:
+        entries = [os.path.basename(entry) for entry in tar_obj.getnames()][1:]
+        entries.sort(reverse = True)
+
+    return(entries)
+
+
+if __name__ == "__main__":
+    main()
+

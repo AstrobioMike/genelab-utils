@@ -1,0 +1,350 @@
+#!/usr/bin/env python
+
+"""
+This is a program for generating the 2 JIRA tables needed for GeneLab amplicon processed datasets for Curation.
+"""
+
+import os
+import sys
+import argparse
+import textwrap
+import pandas as pd
+import tarfile
+import zipfile
+
+parser = argparse.ArgumentParser(description="This program generates the 2 JIRA tables needed for GeneLab amplicon \
+                                             processed datasets to be passed onto Curation.\
+                                             Hard-coded variables that may need to be changed are at the top \
+                                             of the script. It is expected to be run after `GL-validate-amplicon` and \
+                                             `GL-gen-amplicon-readme` have been run successfully.")
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store")
+required.add_argument("-i", "--isa-zip", help='Appropriate ISA file for dataset (zipped)', action="store")
+parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
+                    therefore there are no trimmed sequence data.", action="store_true")
+parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
+parser.add_argument("--type", help='Specify if ASVs or OTUs (default: "ASVs")', action="store", choices = ["ASVs", "OTUs"], default = "ASVs")
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+
+### hard-coded stuff we might want to change ###
+raw_reads_dir = "Raw_Data/"
+fastqc_dir = "FastQC_Outputs/"
+trimmed_reads_dir = "Trimmed_Sequence_Data/"
+filtered_reads_dir = "Filtered_Sequence_Data/"
+final_outputs_dir = "Final_Outputs/"
+
+raw_suffix = "_raw.fastq.gz"
+raw_R1_suffix = "_R1_raw.fastq.gz"
+raw_R2_suffix = "_R2_raw.fastq.gz"
+primer_trimmed_suffix = "_trimmed.fastq.gz"
+primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
+primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
+filtered_suffix = "_filtered.fastq.gz"
+filtered_R1_suffix = "-R1-filtered.fastq.gz"
+filtered_R2_suffix = "-R2-filtered.fastq.gz"
+
+processing_tar_file = "processing_info.tar"
+
+################################################################################
+
+def main():
+
+    check_for_file_and_contents(args.isa_zip)
+
+    check_expected_directories()
+
+    samples_in_JIRA_order = get_samples_from_JIRA(args.isa_zip)
+
+    read_counts_df = get_read_counts_from_raw_multiqc(samples_in_JIRA_order)
+
+    gen_and_write_out_QC_metadata_tab(samples_in_JIRA_order, read_counts_df)
+
+    gen_and_write_out_filenames_table(samples_in_JIRA_order)
+
+    # with open(args.output, "w") as output:
+
+    #     write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
+
+    #     write_body(output, processing_tar_contents)
+
+################################################################################
+
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    """ print wrapper """
+
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def report_failure(message, color = "yellow"):
+    print("")
+    wprint(color_text(message, color))
+    print("\nJIRA-table generation failed.\n")
+    sys.exit(1)
+
+
+def check_expected_directories():
+    """ checks expected directories exist """
+
+    if not os.path.isdir(fastqc_dir):
+
+        report_failure("The directory '" + str(fastqc_dir) + "' was expected but not found.")
+
+
+def check_for_file_and_contents(file_path):
+    """ used by check_fastq_files function """
+
+    if not os.path.exists(file_path):
+        report_failure("The expected file '" + str(file_path) + "' does not exist.")
+    if not os.path.getsize(file_path) > 0:
+        report_failure("The file '" + str(file_path) + "' is empty.")
+
+
+def get_samples_from_JIRA(isa_file):
+    """ gets the sample names in their order from the ISA zip file """
+
+    zip_file = zipfile.ZipFile(isa_file)
+    isa_files = zip_file.namelist()
+
+    # getting wanted filename (those that start with "a_" seem to be what we want)
+    wanted_file_list = [item for item in isa_files if item.startswith("a_")]
+    if len(wanted_file_list) != 1:
+        report_failure("We couldn't find the correct table in the ISA object.")
+
+    wanted_file = wanted_file_list[0]
+
+    df = pd.read_csv(zip_file.open(wanted_file), sep = "\t", usecols = ["Sample Name"])
+    sample_IDs = df["Sample Name"].tolist()
+
+    return(sample_IDs)
+
+
+def get_read_counts_from_raw_multiqc(sample_names):
+
+    zip_file = zipfile.ZipFile(fastqc_dir + "raw_multiqc_data.zip")
+    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+    df.columns = ["sample", "counts"]
+    df.set_index("sample", inplace = True)
+    return(df)
+
+
+def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
+
+    # generating needed order of names row writing out table (which has full file names) and as they are in the multiqc table, for finding them
+    read_count_filename_list = []
+    multiqc_name_list = []
+
+    if not args.single_ended:
+
+        for sample in sample_names:
+
+            read_count_filename_list.append(sample + raw_R1_suffix)
+            read_count_filename_list.append(sample + raw_R2_suffix)
+            multiqc_name_list.append(sample + raw_R1_suffix.replace(".fastq.gz", ""))
+            multiqc_name_list.append(sample + raw_R2_suffix.replace(".fastq.gz", ""))
+
+    else:
+
+        for sample in sample_names:
+
+            read_count_filename_list.append(sample + raw_suffix)
+            multiqc_name_list.append(sample + raw_suffix.replace(".fastq.gz", ""))
+
+
+    # getting counts
+    counts_list = []
+    for entry in multiqc_name_list:
+
+        counts_list.append(read_counts_df.at[entry, "counts"])
+
+    # making counts output table
+    out_df = pd.DataFrame()
+    out_df["File Name"] = read_count_filename_list
+    out_df["Number of Reads"] = counts_list
+
+    out_df.to_csv(args.GLDS_ID + "-QC-metadata.tsv", sep = "\t", float_format='%.0f', index = False)
+
+
+def gen_and_write_out_filenames_table(sample_names):
+
+    with open(args.GLDS_ID + "-processed-file-names.tsv", "w") as output:
+
+        # header
+        if not args.primers_already_trimmed:
+
+            output.write("Sample Name" + "\t" "README" + "\t" + raw_reads_dir.replace("_", " ").rstrip("/") + 
+                "\t" + trimmed_reads_dir.replace("_", " ").rstrip("/") + 
+                "\t" + filtered_reads_dir.replace("_", " ").rstrip("/") + 
+                "\t" + fastqc_dir.replace("_", " ").rstrip("/") + 
+                "\t" + final_outputs_dir.replace("_", " ").rstrip("/") + 
+                "\t" + "Processing Info" + "\n")
+
+        else:
+
+            output.write("Sample Name" + "\t" "README" + "\t" + raw_reads_dir.replace("_", " ").rstrip("/") + 
+                "\t" + filtered_reads_dir.replace("_", " ").rstrip("/") + 
+                "\t" + fastqc_dir.replace("_", " ").rstrip("/") + 
+                "\t" + final_outputs_dir.replace("_", " ").rstrip("/") + 
+                "\t" + "Processing Info" + "\n")
+
+
+        # writing multiple lines for each sample entry (i don't know a better way to make this non-standard format)
+        # if paired-end first
+        if not args.single_ended:
+
+            # this changes what's written out as there would be no primer-trimmed files or column for them
+            if not args.primers_already_trimmed:            
+            
+                for sample in sample_names:
+
+                    output.write(str(sample) + "\t" + "README.txt" + "\t" + 
+                        sample + raw_R1_suffix + "\t" + sample + primer_trimmed_R1_suffix + "\t" + 
+                        sample + filtered_R1_suffix + "\t" + 
+                        "raw_multiqc_data.zip" + "\t" + args.type + ".fasta" + "\t" +
+                        processing_tar_file + 
+                        "\n" +
+                        "\t" + "\t" + 
+                        sample + raw_R2_suffix + "\t" + sample + primer_trimmed_R2_suffix + "\t" + 
+                        sample + filtered_R2_suffix + "\t" + 
+                        "raw_multiqc.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" +
+                        "trimmed-read-counts.tsv" + "\t" +
+                        "filtered-read-counts.tsv" + "\t" +
+                        "filtered_multiqc_data.zip" + "\t" +
+                        "read-count-tracking.tsv" + "\t" + "" +
+                        "\n" + 
+                        "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "filtered_multiqc.html.zip" + "\t" +
+                        "taxonomy-and-counts.biom.zip" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "taxonomy.tsv" + "\t" + "" +
+                        "\n"
+                        "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "taxonomy-and-counts.tsv" + "\t" + "" +
+                        "\n" + "\n")
+
+            else:
+
+                for sample in sample_names:
+
+                    output.write(str(sample) + "\t" + "README.txt" + "\t" + 
+                        sample + raw_R1_suffix + "\t" + 
+                        sample + filtered_R1_suffix + "\t" + 
+                        "raw_multiqc_data.zip" + "\t" + args.type + ".fasta" + "\t" +
+                        processing_tar_file + 
+                        "\n" +
+                        "\t" + "\t" + 
+                        sample + raw_R2_suffix + "\t" +  
+                        sample + filtered_R2_suffix + "\t" + 
+                        "raw_multiqc.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" +
+                        "filtered-read-counts.tsv" + "\t" +
+                        "filtered_multiqc_data.zip" + "\t" +
+                        "read-count-tracking.tsv" + "\t" + "" +
+                        "\n" + 
+                        "\t" + "\t" + "\t" + "\t" +
+                        "filtered_multiqc.html.zip" + "\t" +
+                        "taxonomy-and-counts.biom.zip" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "taxonomy.tsv" + "\t" + "" +
+                        "\n"
+                        "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "taxonomy-and-counts.tsv" + "\t" + "" +
+                        "\n" + "\n")
+
+        # now single-end
+        else:
+
+            # this changes what's written out as there would be no primer-trimmed files or column for them
+            if not args.primers_already_trimmed:            
+            
+                for sample in sample_names:
+
+                    output.write(str(sample) + "\t" + "README.txt" + "\t" + 
+                        sample + raw_suffix + "\t" + sample + primer_trimmed_suffix + "\t" + 
+                        sample + filtered_suffix + "\t" + 
+                        "raw_multiqc_data.zip" + "\t" + args.type + ".fasta" + "\t" +
+                        processing_tar_file + 
+                        "\n" +
+                        "\t" + "\t" + "\t" + 
+                        "trimmed-read-counts.tsv" + "\t" +
+                        "filtered-read-counts.tsv" + "\t" +
+                        "raw_multiqc.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" + "\t" + "\t" 
+                        "filtered_multiqc_data.zip" + "\t" +
+                        "read-count-tracking.tsv" + "\t" + "" +
+                        "\n" + 
+                        "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "filtered_multiqc.html.zip" + "\t" +
+                        "taxonomy-and-counts.biom.zip" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "taxonomy.tsv" + "\t" + "" +
+                        "\n"
+                        "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "taxonomy-and-counts.tsv" + "\t" + "" +
+                        "\n" + "\n")
+
+            else:
+
+                for sample in sample_names:
+
+                    output.write(str(sample) + "\t" + "README.txt" + "\t" + 
+                        sample + raw_suffix + "\t" +  
+                        sample + filtered_suffix + "\t" + 
+                        "raw_multiqc_data.zip" + "\t" + args.type + ".fasta" + "\t" +
+                        processing_tar_file + 
+                        "\n" +
+                        "\t" + "\t" + "\t" +
+                        "filtered-read-counts.tsv" + "\t" +
+                        "raw_multiqc.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" + "\t" +
+                        "filtered_multiqc_data.zip" + "\t" +
+                        "read-count-tracking.tsv" + "\t" + "" +
+                        "\n" + 
+                        "\t" + "\t" + "\t" + "\t" +
+                        "filtered_multiqc.html.zip" + "\t" +
+                        "taxonomy-and-counts.biom.zip" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" + "\t" + "\t" +
+                        "taxonomy.tsv" + "\t" + "" +
+                        "\n"
+                        "\t" + "\t" + "\t" + "\t" + "\t" + 
+                        "taxonomy-and-counts.tsv" + "\t" + "" +
+                        "\n" + "\n")
+
+
+if __name__ == "__main__":
+    main()
+
