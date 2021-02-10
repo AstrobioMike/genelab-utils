@@ -46,8 +46,8 @@ primer_trimmed_suffix = "_trimmed.fastq.gz"
 primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
 primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
 filtered_suffix = "_filtered.fastq.gz"
-filtered_R1_suffix = "-R1-filtered.fastq.gz"
-filtered_R2_suffix = "-R2-filtered.fastq.gz"
+filtered_R1_suffix = "_R1_filtered.fastq.gz"
+filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
 processing_tar_file = "processing_info.tar"
 
