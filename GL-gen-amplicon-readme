@@ -40,16 +40,6 @@ trimmed_reads_dir = "Trimmed_Sequence_Data/"
 filtered_reads_dir = "Filtered_Sequence_Data/"
 final_outputs_dir = "Final_Outputs/"
 
-raw_suffix = "_raw.fastq.gz"
-raw_R1_suffix = "_R1_raw.fastq.gz"
-raw_R2_suffix = "_R2_raw.fastq.gz"
-primer_trimmed_suffix = "_trimmed.fastq.gz"
-primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
-primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
-filtered_suffix = "_filtered.fastq.gz"
-filtered_R1_suffix = "-R1-filtered.fastq.gz"
-filtered_R2_suffix = "-R2-filtered.fastq.gz"
-
 processing_tar_file = "processing_info.tar"
 
 expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
@@ -67,6 +57,8 @@ def main():
         write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
 
         write_body(output, processing_tar_contents)
+
+        output.write("\n")
 
 ################################################################################
 
@@ -165,7 +157,7 @@ def check_expected_directories():
 
 
 def check_for_file_and_contents(file_path):
-    """ used by check_fastq_files function """
+    """ used by get_processing_tar_contents function """
 
     if not os.path.exists(file_path):
         report_failure("The expected file '" + str(file_path) + "' does not exist.")
@@ -174,7 +166,7 @@ def check_for_file_and_contents(file_path):
 
 
 def get_processing_tar_contents():
-    """ this just makes sure a processing tar exists and at least has the Snakefile, as its contents can vary quite a bit """
+    """ this gets the filenames that are in the processing_info.tar to add them to the readme """
 
     check_for_file_and_contents(processing_tar_file)
 
