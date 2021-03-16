@@ -14,7 +14,7 @@ import tarfile
 
 
 parser = argparse.ArgumentParser(description="This program validates GeneLab amplicon processed datasets. \
-                                             Hard-coded variables that may need to be changed are at the top \
+                                             Hard-coded variables that may need to be changed are near the top \
                                              of the script.")
 
 required = parser.add_argument_group('required arguments')
@@ -51,7 +51,11 @@ filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
 processing_tar_file = "processing_info.tar"
 
+expected_trimmed_outputs_or_suffixes = ["cutadapt.log", "trimmed-read-counts.tsv"]
+expected_filtered_outputs_or_suffixes = ["filtered-read-counts.tsv"]
 expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
+
+validation_log = "validation.log"
 
 ################################################################################
 
@@ -64,6 +68,8 @@ def main():
     check_fastq_files(sample_names)
 
     check_multiqc_outputs(sample_names)
+
+    check_intermediate_log_files()
 
     check_final_outputs()
 
@@ -100,6 +106,10 @@ def report_failure(message, color = "yellow"):
     print("")
     wprint(color_text(message, color))
     print("\nValidation failed.\n")
+
+    with open("validation.log", "a") as log:
+        log.write(message + "\n" + "Validation failed." + "\n\n")
+    
     sys.exit(1)
 
 
@@ -107,6 +117,20 @@ def report_success():
     print("")
     wprint(color_text("Validation has completed successfully :)", "green"))
     print("")
+
+    if not os.path.exists(validation_log) or os.path.getsize(validation_log) == 0:
+
+        with open(validation_log, "w") as log:
+            log.write("   -----------------------------------------------------------------------------\n")
+            log.write("                         Validation completed successfully." + "\n")
+            log.write("   -----------------------------------------------------------------------------\n")
+
+    else:
+
+        with open(validation_log, "a") as log:
+            log.write("   -----------------------------------------------------------------------------\n")
+            log.write("\tThe above were addressed and validation now completed successfully." + "\n")
+            log.write("   -----------------------------------------------------------------------------\n")
 
 def check_expected_directories():
     """ checks expected directories exist """
@@ -135,7 +159,7 @@ def read_samples(file_path):
 
 
 def check_for_file_and_contents(file_path):
-    """ used by check_fastq_files function """
+    """ used by check_fastq_files and check_final_outputs functions """
 
     if not os.path.exists(file_path):
         report_failure("The expected file '" + str(file_path) + "' does not exist.")
@@ -193,9 +217,9 @@ def check_multiqc_outputs(sample_names):
 
         for sample in sample_names:
             if not sample + R1_suffix in file_prefixes_in_multiqc:
-                report_failure("The filtered multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
+                report_failure("The raw multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
             if not sample + R2_suffix in file_prefixes_in_multiqc:
-                report_failure("The filtered multiqc output is missing the expected '" + sample + R2_suffix + "' entry.")
+                report_failure("The raw multiqc output is missing the expected '" + sample + R2_suffix + "' entry.")
 
     else:
 
@@ -203,7 +227,7 @@ def check_multiqc_outputs(sample_names):
 
         for sample in sample_names:
             if not sample + suffix in file_prefixes_in_multiqc:
-                report_failure("The filtered multiqc output is missing the expected '" + sample + suffix + "' entry.")
+                report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
     # checking filtered
     zip_file = zipfile.ZipFile(fastqc_dir + "filtered_multiqc_data.zip")
@@ -252,7 +276,28 @@ def check_general_fasta_format(file_path):
 
 def get_files_in_dir(dir_path):
 
-    return([f for f in os.listdir(final_outputs_dir) if os.path.isfile(os.path.join(final_outputs_dir, f))])
+    return([f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))])
+
+
+def check_intermediate_log_files():
+
+    ## trimmed if needed
+    if not args.primers_already_trimmed:
+
+        output_files_present = get_files_in_dir(trimmed_reads_dir)
+
+        for entry in expected_trimmed_outputs_or_suffixes:
+
+            if not any(output_file.endswith(entry) for output_file in output_files_present):
+                report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(trimmed_reads_dir) + ".")
+
+    ## filtered
+    output_files_present = get_files_in_dir(filtered_reads_dir)
+
+    for entry in expected_filtered_outputs_or_suffixes:
+
+        if not any(output_file.endswith(entry) for output_file in output_files_present):
+            report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(filtered_reads_dir) + ".")
 
 
 def check_final_outputs():

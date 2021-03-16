@@ -1,0 +1,523 @@
+#!/usr/bin/env python
+
+"""
+This is a program for validating GeneLab Illumina metageonmics processed datasets.
+"""
+
+import os
+import sys
+import argparse
+import textwrap
+import pandas as pd
+import zipfile
+import tarfile
+
+
+parser = argparse.ArgumentParser(description="This program validates GeneLab Illumina metagenomics processed datasets. \
+                                             Hard-coded variables that may need to be changed are near the top \
+                                             of the script.")
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store")
+parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
+
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+
+### hard-coded stuff we might want to change ###
+raw_reads_dir = "Raw_Data/"
+fastqc_dir = "FastQC_Outputs/"
+filtered_reads_dir = "Filtered_Sequence_Data/"
+assembly_based_dir = "Assembly-based_Processing/"
+assemblies_dir = assembly_based_dir + "assemblies/"
+genes_dir = assembly_based_dir + "predicted-genes/"
+annotations_and_tax_dir = assembly_based_dir + "annotations-and-taxonomy/"
+mapping_dir = assembly_based_dir + "read-mapping/"
+combined_output_dir = assembly_based_dir + "combined-outputs/"
+bins_dir = assembly_based_dir + "bins/"
+MAGs_dir = assembly_based_dir + "MAGs/"
+read_based_dir = "Read-based_Processing/"
+logs_dir = "processing_info/logs/"
+
+expected_dirs = [raw_reads_dir, fastqc_dir, filtered_reads_dir, assembly_based_dir,
+                 assemblies_dir, genes_dir, annotations_and_tax_dir, mapping_dir,
+                 combined_output_dir, bins_dir, MAGs_dir, read_based_dir, logs_dir]
+
+assembly_based_dirs = [assemblies_dir, genes_dir, annotations_and_tax_dir, mapping_dir,
+                       combined_output_dir, bins_dir, MAGs_dir]
+
+raw_suffix = "_raw.fastq.gz"
+raw_R1_suffix = "_R1_raw.fastq.gz"
+raw_R2_suffix = "_R2_raw.fastq.gz"
+filtered_suffix = "_filtered.fastq.gz"
+filtered_R1_suffix = "_R1_filtered.fastq.gz"
+filtered_R2_suffix = "_R2_filtered.fastq.gz"
+
+assembly_suffix = "-assembly.fasta"
+
+
+expected_assembly_combined_outputs = ["Combined-contig-level-taxonomy-coverages-CPM.tsv", "Combined-gene-level-KO-function-coverages-CPM.tsv",
+                                      "Combined-gene-level-taxonomy-coverages-CPM.tsv", "Combined-contig-level-taxonomy-coverages.tsv",
+                                      "Combined-gene-level-KO-function-coverages.tsv", "Combined-gene-level-taxonomy-coverages.tsv"]
+
+expected_read_based_outputs = ["Gene-families-KO-cpm.tsv", "Gene-families-cpm.tsv", "Gene-families-grouped-by-taxa.tsv",
+                               "Gene-families.tsv", "Metaphlan-taxonomy.tsv", "Pathway-abundances-cpm.tsv",
+                               "Pathway-abundances-grouped-by-taxa.tsv", "Pathway-abundances.tsv",
+                               "Pathway-coverages-grouped-by-taxa.tsv", "Pathway-coverages.tsv"]
+
+expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
+
+
+processing_tar_file = "processing_info.tar"
+
+expected_tar_contents = ["/Snakefile", "/config.yaml", "/envs", "/logs", "/scripts", "/unique-sample-IDs.txt"]
+
+expected_log_file_suffixes = ["-CAT.log", "-assembly.log", "-bam-summarize-and-metabat.log", "-bowtie2-build.log", 
+                              "-kofamscan.log", "-pileup.log", "-prodigal.log", "-humann3-run.log"]
+
+
+validation_log = "validation.log"
+
+################################################################################
+
+def main():
+
+    check_expected_directories()
+
+    sample_names = read_samples(args.sample_names_file)
+
+    check_fastq_files(sample_names)
+
+    check_multiqc_outputs(sample_names)
+
+    failed_assemblies_list = get_failed_assemblies()
+
+    successful_assemblies_list = get_successful_assemblies(sample_names, failed_assemblies_list)
+
+    check_assembly_based_outputs(sample_names, failed_assemblies_list, successful_assemblies_list)
+
+    check_read_based_outputs(expected_read_based_outputs)
+
+    check_processing_tar(sample_names)
+
+    # check_log_files()
+
+    report_success()
+
+################################################################################
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    """ print wrapper """
+
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def report_failure(message, color = "yellow"):
+    print("")
+    wprint(color_text(message, color))
+    print("\nValidation failed.\n")
+
+    with open("validation.log", "a") as log:
+        log.write(message + "\n" + "Validation failed." + "\n\n")
+    
+    sys.exit(1)
+
+
+def report_success():
+    print("")
+    wprint(color_text("Validation has completed successfully :)", "green"))
+    print("")
+
+    if not os.path.exists(validation_log) or os.path.getsize(validation_log) == 0:
+
+        with open(validation_log, "w") as log:
+            log.write("   -----------------------------------------------------------------------------\n")
+            log.write("                         Validation completed successfully." + "\n")
+            log.write("   -----------------------------------------------------------------------------\n")
+
+    else:
+
+        with open(validation_log, "a") as log:
+            log.write("   -----------------------------------------------------------------------------\n")
+            log.write("\tThe above were addressed and validation now completed successfully." + "\n")
+            log.write("   -----------------------------------------------------------------------------\n")
+
+def check_expected_directories():
+    """ checks expected directories exist """
+
+    for directory in expected_dirs:
+        if not os.path.isdir(directory):
+
+            report_failure("The directory '" + str(directory) + "' was expected but not found.")
+
+
+def read_samples(file_path):
+    """ reading unique sample names into list """
+
+    with open(file_path) as f:
+        sample_names = f.read().splitlines()
+
+    return(sample_names)
+
+
+def check_for_file_and_contents(file_path):
+    """ used by check_fastq_files and check_final_outputs functions """
+
+    if not os.path.exists(file_path):
+        report_failure("The expected file '" + str(file_path) + "' does not exist.")
+    if not os.path.getsize(file_path) > 0:
+        report_failure("The file '" + str(file_path) + "' is empty.")
+
+
+def check_fastq_files(sample_names):
+    """ makes sure all expected read fastq files exist and hold something """
+
+    for sample in sample_names:
+
+        ## if paired-end
+        if not args.single_ended:
+
+            ## raw
+            check_for_file_and_contents(raw_reads_dir + sample + raw_R1_suffix)
+            check_for_file_and_contents(raw_reads_dir + sample + raw_R2_suffix)
+
+
+            ## quality filtered
+            check_for_file_and_contents(filtered_reads_dir + sample + filtered_R1_suffix)
+            check_for_file_and_contents(filtered_reads_dir + sample + filtered_R2_suffix)
+
+        ## if single-end
+        else:
+
+            ## raw
+            check_for_file_and_contents(raw_reads_dir + sample + raw_suffix)
+
+            ## filtered
+            check_for_file_and_contents(filtered_reads_dir + sample + filtered_suffix)
+
+
+def check_multiqc_outputs(sample_names):
+    """ makes sure all samples' read files are in the multiqc outputs """
+
+    # checking raw
+    zip_file = zipfile.ZipFile(fastqc_dir + "raw_multiqc_data.zip")
+    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    file_prefixes_in_multiqc = df["Sample"].tolist()
+
+    if not args.single_ended:
+
+        R1_suffix = raw_R1_suffix.split(".")[0]
+        R2_suffix = raw_R2_suffix.split(".")[0]
+
+        for sample in sample_names:
+            if not sample + R1_suffix in file_prefixes_in_multiqc:
+                report_failure("The raw multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
+            if not sample + R2_suffix in file_prefixes_in_multiqc:
+                report_failure("The raw multiqc output is missing the expected '" + sample + R2_suffix + "' entry.")
+
+    else:
+
+        suffix = raw_suffix.split(".")[0]
+
+        for sample in sample_names:
+            if not sample + suffix in file_prefixes_in_multiqc:
+                report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
+
+    # checking filtered
+    zip_file = zipfile.ZipFile(fastqc_dir + "filtered_multiqc_data.zip")
+    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    file_prefixes_in_multiqc = df["Sample"].tolist()
+
+    if not args.single_ended:
+
+        R1_suffix = filtered_R1_suffix.split(".")[0]
+        R2_suffix = filtered_R2_suffix.split(".")[0]
+        for sample in sample_names:
+            if not sample + R1_suffix in file_prefixes_in_multiqc:
+                report_failure("The filtered multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
+            if not sample + R2_suffix in file_prefixes_in_multiqc:
+                report_failure("The filtered multiqc output is missing the expected '" + sample + R2_suffix + "' entry.")
+
+    else:
+
+        suffix = filtered_suffix.split(".")[0]
+        for sample in sample_names:
+            if not sample + suffix in file_prefixes_in_multiqc:
+                report_failure("The filtered multiqc output is missing the expected '" + sample + suffix + "' entry.")
+
+
+def check_log_files():
+
+    ## filtered
+    output_files_present = get_files_in_dir(filtered_reads_dir)
+
+    for entry in expected_filtered_outputs_or_suffixes:
+
+        if not any(output_file.endswith(entry) for output_file in output_files_present):
+            report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(filtered_reads_dir) + ".")
+
+
+def check_general_fasta_format(file_path):
+
+    if not os.path.getsize(file_path) > 0:
+        report_failure("The fasta file '" + str(file_path) + "' is empty but isn't expected to be.")
+
+    line_num = 0
+    num_headers = 0
+    num_seqs = 0
+
+    with open(file_path) as in_file:
+        
+        for line in in_file:
+        
+            # keeping track of current line for reporting any problems
+            line_num += 1
+
+            if line.strip().startswith(">"):
+                num_headers += 1
+            else:
+                num_seqs += 1
+
+            if num_headers != num_seqs + 1 and num_headers != num_seqs:
+                report_failure("Fasta file '" + str(file_path) + "' does not seem to be formatted properly. Problem detected at line " + str(line_num) + ".")
+
+
+def get_files_in_dir(dir_path):
+
+    return([f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))])
+
+
+def get_failed_assemblies():
+
+    failed_assemblies_list = []
+
+    if os.path.exists(assemblies_dir + "Failed-assemblies.tsv"):
+        with open(assemblies_dir + "Failed-assemblies.tsv") as failed_assemblies:
+            for line in failed_assemblies:
+                failed_assemblies_list.append(line.strip().split("\t")[0])
+
+    return(failed_assemblies_list)
+
+
+def get_successful_assemblies(sample_names, failed_assemblies_list):
+
+    successful_assemblies = list(set(sample_names) - set(failed_assemblies_list))
+
+    return(successful_assemblies)
+
+
+def check_assembly_based_file(sample, file_path, failed_assemblies_list):
+
+    if not os.path.exists(file_path):
+        report_failure("The expected file '" + str(file_path) + "' does not exist.")
+
+    if not os.path.getsize(file_path) > 0:
+
+        if sample not in failed_assemblies_list:
+
+            report_failure("The file '" + str(file_path) + "' is empty, but that sample isn't noted in the 'Failed-assemblies.tsv' file as it should be if the assembly failed.")
+
+
+def check_assembly_based_outputs(sample_names, failed_assemblies_list, successful_assemblies_list):
+    """ makes sure outputs exist and checks formatting """
+
+    ## assemblies_dir ##
+    for sample in sample_names:
+
+        curr_fasta_path = assemblies_dir + sample + assembly_suffix
+
+        # checking the file is present and not empty, unless it is noted in the Failed-assemblies file, then continuing to next sample
+        check_assembly_based_file(sample, curr_fasta_path, failed_assemblies_list)
+
+        # checking the general fasta format if present
+        if sample not in failed_assemblies_list:
+
+            check_general_fasta_format(curr_fasta_path)
+
+    # making sure assembly summary file is there
+    assembly_summary_path = assemblies_dir + "assembly-summaries.tsv"
+
+    if not os.path.exists(assembly_summary_path):
+        report_failure("The assembly summary file, " + str(assembly_summary_path) + ", is expected but was not found.")
+
+
+    ## genes_dir ##
+    predicted_gene_file_suffixes = ["-genes.faa", "-genes.gff", "-genes.fasta"]
+    gene_fasta_suffixes = ["-genes.faa", "-genes.fasta"]
+
+    # if any assemblies failed, these files will be present but empty
+    for sample in sample_names:
+
+        for suffix in predicted_gene_file_suffixes:
+
+            curr_file_path = genes_dir + sample + suffix
+
+            # checking the file is present and not empty unless it is noted in the Failed-assemblies file
+            check_assembly_based_file(sample, curr_file_path, failed_assemblies_list)
+            
+        # checking fasta format for those that have stuff in them
+        if sample not in failed_assemblies_list:
+
+            for suffix in gene_fasta_suffixes:
+
+                curr_fasta_path = genes_dir + sample + suffix
+                check_general_fasta_format(curr_fasta_path)
+
+
+    ## annotations_and_tax_dir ##
+    annotations_suffixes = ["-gene-coverage-annotation-and-tax.tsv", "-contig-coverage-and-tax.tsv"]
+
+    for sample in sample_names:
+
+        for suffix in annotations_suffixes:
+
+            curr_file_path = annotations_and_tax_dir + sample + suffix
+
+            check_for_file_and_contents(curr_file_path)
+
+
+    ## mapping_dir ##
+    mapping_dir_suffixes_all_have = [".bam", "-metabat-assembly-depth.tsv"]
+    mapping_info_suffix = "-mapping-info.txt"
+
+    for sample in sample_names:
+
+        for suffix in mapping_dir_suffixes_all_have:
+
+            curr_file_path = mapping_dir + sample + suffix
+
+            # checking the file is present and not empty unless it is noted in the Failed-assemblies file
+            check_assembly_based_file(sample, curr_file_path, failed_assemblies_list)
+
+        # checking for mapping-info file for those that should have it
+        if sample not in failed_assemblies_list:
+
+            curr_file_path = mapping_dir + sample + mapping_info_suffix
+
+            check_assembly_based_file(sample, curr_file_path, failed_assemblies_list)
+
+    ## combined_output_dir ##
+    for filename in expected_assembly_combined_outputs:
+
+        curr_file_path = combined_output_dir + filename
+
+        check_for_file_and_contents(curr_file_path)
+
+
+    ## bins_dir ##
+    # only if there were bins recovered
+    output_files_present = get_files_in_dir(bins_dir)
+
+    if output_files_present:
+
+        output_fasta_bins = [filename for filename in output_files_present if filename.endswith(".fa")]
+        
+        # checking for contents (checking fasta format not straightforward when there are softwraps, but don't want to remove them on these due to large contigs)
+        for bin_file in output_fasta_bins:
+
+            curr_file_path = bins_dir + bin_file
+
+            if not os.path.getsize(curr_file_path) > 0:
+
+                report_failure("The file '" + str(file_path) + "' is empty, but shouldn't be there if that's the case.")
+
+        # making sure summary table is there if there are any bins
+        if len(output_fasta_bins) > 0:
+        
+            bins_summary_path = bins_dir + "bins-overview.tsv"
+
+            if not os.path.exists(bins_summary_path):
+
+                report_failure("The bins summary file, " + str(bins_summary_path) + ", is expected but was not found.")
+
+
+    ## MAGs_dir ##
+    # only if there were MAGs recovered
+    output_files_present = get_files_in_dir(MAGs_dir)
+
+    if output_files_present:
+
+        output_fasta_MAGs = [filename for filename in output_files_present if filename.endswith(".fa")]
+        
+        # checking for contents (checking fasta format not straightforward when there are softwraps, but don't want to remove them on these due to large contigs)
+        for MAG_file in output_fasta_MAGs:
+
+            curr_file_path = MAGs_dir + MAG_file
+
+            if not os.path.getsize(curr_file_path) > 0:
+
+                report_failure("The file '" + str(file_path) + "' is empty, but shouldn't be there if that's the case.")
+
+        # making sure summary table is there if there are any bins
+        if len(output_fasta_bins) > 0:
+        
+            MAGs_summary_path = MAGs_dir + "MAGs-overview.tsv"
+
+            if not os.path.exists(MAGs_summary_path):
+
+                report_failure("The MAGs summary file, " + str(MAGs_summary_path) + ", is expected but was not found.")
+
+
+def check_read_based_outputs(filenames):
+    """ makes sure outputs exist and aren't empty """
+
+    for file in filenames:
+
+        check_for_file_and_contents(read_based_dir + file)
+
+
+def check_processing_tar(samples):
+    """ this makes sure a processing tar exists and contains what we expect """
+
+    check_for_file_and_contents(processing_tar_file)
+
+    with tarfile.open(processing_tar_file) as tar_obj:
+        entries = tar_obj.getnames()
+
+    for item in expected_tar_contents:
+
+        if entries[0] + item not in entries:
+            report_failure("The '" + str(processing_tar_file) + "' does not have '" + str(item) + "' as expected.")
+
+    # checking log files
+    for sample in samples:
+
+        for suffix in expected_log_file_suffixes:
+
+            target_log = logs_dir + sample + suffix
+
+            if target_log not in entries:
+                report_failure("The '" + str(processing_tar_file) + "' does not have the '" + str(target_log) + "' log file as expected.")
+
+        target_log = str(logs_dir) + "bbduk-" + str(sample) + ".log"
+
+        if target_log not in entries:
+            report_failure("The '" + str(processing_tar_file) + "' does not have the '" + str(target_log) + "' log file as expected.")
+
+
+if __name__ == "__main__":
+    main()
+
