@@ -48,8 +48,8 @@ primer_trimmed_suffix = "_trimmed.fastq.gz"
 primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
 primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
 filtered_suffix = "_filtered.fastq.gz"
-filtered_R1_suffix = "-R1-filtered.fastq.gz"
-filtered_R2_suffix = "-R2-filtered.fastq.gz"
+filtered_R1_suffix = "_R1_filtered.fastq.gz"
+filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
 processing_tar_file = "processing_info.tar"
 
@@ -192,7 +192,7 @@ def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
 
 def gen_and_write_out_filenames_table(sample_names):
 
-    with open(args.GLDS_ID + "-processed-file-names.tsv", "w") as output:
+    with open(args.GLDS_ID + "-associated-file-names.tsv", "w") as output:
 
         # header
         if not args.primers_already_trimmed:

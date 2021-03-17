@@ -142,7 +142,7 @@ def report_failure(message, color = "yellow"):
 
     with open("validation.log", "a") as log:
         log.write(message + "\n" + "Validation failed." + "\n\n")
-    
+
     sys.exit(1)
 
 
@@ -290,9 +290,9 @@ def check_general_fasta_format(file_path):
     num_seqs = 0
 
     with open(file_path) as in_file:
-        
+
         for line in in_file:
-        
+
             # keeping track of current line for reporting any problems
             line_num += 1
 
@@ -329,14 +329,16 @@ def get_successful_assemblies(sample_names, failed_assemblies_list):
     return(successful_assemblies)
 
 
-def check_assembly_based_file(sample, file_path, failed_assemblies_list):
+def check_assembly_based_file(sample, file_path, failed_assemblies_list, assembly = True):
 
     if not os.path.exists(file_path):
         report_failure("The expected file '" + str(file_path) + "' does not exist.")
 
     if not os.path.getsize(file_path) > 0:
 
-        if sample not in failed_assemblies_list:
+
+        # a sample can have no genes called even if the assembly produced contigs, so this is only throwing a warning if we are checking an assembly here
+        if sample not in failed_assemblies_list and assembly == True:
 
             report_failure("The file '" + str(file_path) + "' is empty, but that sample isn't noted in the 'Failed-assemblies.tsv' file as it should be if the assembly failed.")
 
@@ -368,7 +370,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
     predicted_gene_file_suffixes = ["-genes.faa", "-genes.gff", "-genes.fasta"]
     gene_fasta_suffixes = ["-genes.faa", "-genes.fasta"]
 
-    # if any assemblies failed, these files will be present but empty
+    # if any assemblies failed, these files will be present but empty (they may be empty if an assembly produced contigs too)
     for sample in sample_names:
 
         for suffix in predicted_gene_file_suffixes:
@@ -376,15 +378,17 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
             curr_file_path = genes_dir + sample + suffix
 
             # checking the file is present and not empty unless it is noted in the Failed-assemblies file
-            check_assembly_based_file(sample, curr_file_path, failed_assemblies_list)
-            
+            check_assembly_based_file(sample, curr_file_path, failed_assemblies_list, assembly = False)
+
         # checking fasta format for those that have stuff in them
         if sample not in failed_assemblies_list:
 
             for suffix in gene_fasta_suffixes:
 
                 curr_fasta_path = genes_dir + sample + suffix
-                check_general_fasta_format(curr_fasta_path)
+
+                if os.path.getsize(curr_fasta_path) > 0:
+                    check_general_fasta_format(curr_fasta_path)
 
 
     ## annotations_and_tax_dir ##
@@ -434,7 +438,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
     if output_files_present:
 
         output_fasta_bins = [filename for filename in output_files_present if filename.endswith(".fa")]
-        
+
         # checking for contents (checking fasta format not straightforward when there are softwraps, but don't want to remove them on these due to large contigs)
         for bin_file in output_fasta_bins:
 
@@ -446,7 +450,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
 
         # making sure summary table is there if there are any bins
         if len(output_fasta_bins) > 0:
-        
+
             bins_summary_path = bins_dir + "bins-overview.tsv"
 
             if not os.path.exists(bins_summary_path):
@@ -461,7 +465,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
     if output_files_present:
 
         output_fasta_MAGs = [filename for filename in output_files_present if filename.endswith(".fa")]
-        
+
         # checking for contents (checking fasta format not straightforward when there are softwraps, but don't want to remove them on these due to large contigs)
         for MAG_file in output_fasta_MAGs:
 
@@ -473,7 +477,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
 
         # making sure summary table is there if there are any bins
         if len(output_fasta_bins) > 0:
-        
+
             MAGs_summary_path = MAGs_dir + "MAGs-overview.tsv"
 
             if not os.path.exists(MAGs_summary_path):
