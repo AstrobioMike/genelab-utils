@@ -231,7 +231,7 @@ def gen_and_write_out_filenames_table(sample_names):
                         "\t" + "\t" + 
                         sample + raw_R2_suffix + "\t" + sample + primer_trimmed_R2_suffix + "\t" + 
                         sample + filtered_R2_suffix + "\t" + 
-                        "raw_multiqc.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "raw_multiqc_report.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" +
                         "trimmed-read-counts.tsv" + "\t" +
@@ -239,8 +239,8 @@ def gen_and_write_out_filenames_table(sample_names):
                         "filtered_multiqc_data.zip" + "\t" +
                         "read-count-tracking.tsv" + "\t" + "" +
                         "\n" + 
-                        "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "filtered_multiqc.html.zip" + "\t" +
+                        "\t" + "\t" + "\t" + "cutadapt.log" + "\t" + "\t" +
+                        "filtered_multiqc_report.html.zip" + "\t" +
                         "taxonomy-and-counts.biom.zip" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
@@ -263,7 +263,7 @@ def gen_and_write_out_filenames_table(sample_names):
                         "\t" + "\t" + 
                         sample + raw_R2_suffix + "\t" +  
                         sample + filtered_R2_suffix + "\t" + 
-                        "raw_multiqc.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "raw_multiqc_report.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" +
                         "filtered-read-counts.tsv" + "\t" +
@@ -271,7 +271,7 @@ def gen_and_write_out_filenames_table(sample_names):
                         "read-count-tracking.tsv" + "\t" + "" +
                         "\n" + 
                         "\t" + "\t" + "\t" + "\t" +
-                        "filtered_multiqc.html.zip" + "\t" +
+                        "filtered_multiqc_report.html.zip" + "\t" +
                         "taxonomy-and-counts.biom.zip" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" +
@@ -298,14 +298,14 @@ def gen_and_write_out_filenames_table(sample_names):
                         "\t" + "\t" + "\t" + 
                         "trimmed-read-counts.tsv" + "\t" +
                         "filtered-read-counts.tsv" + "\t" +
-                        "raw_multiqc.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "raw_multiqc_report.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" 
                         "filtered_multiqc_data.zip" + "\t" +
                         "read-count-tracking.tsv" + "\t" + "" +
                         "\n" + 
                         "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "filtered_multiqc.html.zip" + "\t" +
+                        "filtered_multiqc_report.html.zip" + "\t" +
                         "taxonomy-and-counts.biom.zip" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
@@ -327,14 +327,14 @@ def gen_and_write_out_filenames_table(sample_names):
                         "\n" +
                         "\t" + "\t" + "\t" +
                         "filtered-read-counts.tsv" + "\t" +
-                        "raw_multiqc.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "raw_multiqc_report.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" +
                         "filtered_multiqc_data.zip" + "\t" +
                         "read-count-tracking.tsv" + "\t" + "" +
                         "\n" + 
                         "\t" + "\t" + "\t" + "\t" +
-                        "filtered_multiqc.html.zip" + "\t" +
+                        "filtered_multiqc_report.html.zip" + "\t" +
                         "taxonomy-and-counts.biom.zip" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" +
