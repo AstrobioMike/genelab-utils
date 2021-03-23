@@ -19,7 +19,9 @@ parser = argparse.ArgumentParser(description="This program validates GeneLab amp
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store")
+required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
+required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store", required = True)
+parser.add_argument("-p", "--output-prefix", help = "Output file prefix if there is one", action="store", default = "")
 parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
                     therefore there are no trimmed sequence data.", action="store_true")
 parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
@@ -51,11 +53,11 @@ filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
 processing_tar_file = "processing_info.tar"
 
-expected_trimmed_outputs_or_suffixes = ["cutadapt.log", "trimmed-read-counts.tsv"]
+expected_trimmed_outputs_or_suffixes = [str(args.output_prefix) + "cutadapt.log", str(args.output_prefix) + "trimmed-read-counts.tsv"]
 expected_filtered_outputs_or_suffixes = ["filtered-read-counts.tsv"]
-expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
+expected_final_outputs_or_suffixes = [".fasta", str(args.output_prefix) + "counts.tsv", str(args.output_prefix) + "taxonomy.tsv", ".biom.zip", str(args.output_prefix) + "taxonomy-and-counts.tsv", str(args.output_prefix) + "read-count-tracking.tsv"]
 
-validation_log = "validation.log"
+validation_log = str(args.GLDS_ID) + "-" + str(args.output_prefix) + "amplicon-validation.log"
 
 ################################################################################
 
@@ -98,7 +100,7 @@ def color_text(text, color='green'):
 def wprint(text):
     """ print wrapper """
 
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
+    print(textwrap.fill(text, width=80, initial_indent="  ",
           subsequent_indent="  ", break_on_hyphens=False))
 
 
@@ -109,7 +111,7 @@ def report_failure(message, color = "yellow"):
 
     with open("validation.log", "a") as log:
         log.write(message + "\n" + "Validation failed." + "\n\n")
-    
+
     sys.exit(1)
 
 
@@ -206,7 +208,7 @@ def check_multiqc_outputs(sample_names):
     """ makes sure all samples' read files are in the multiqc outputs """
 
     # checking raw
-    zip_file = zipfile.ZipFile(fastqc_dir + "raw_multiqc_data.zip")
+    zip_file = zipfile.ZipFile(fastqc_dir + str(args.output_prefix) + "raw_multiqc_data.zip")
     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
@@ -230,7 +232,7 @@ def check_multiqc_outputs(sample_names):
                 report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
     # checking filtered
-    zip_file = zipfile.ZipFile(fastqc_dir + "filtered_multiqc_data.zip")
+    zip_file = zipfile.ZipFile(fastqc_dir + str(args.output_prefix) + "filtered_multiqc_data.zip")
     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
@@ -259,9 +261,9 @@ def check_general_fasta_format(file_path):
     num_seqs = 0
 
     with open(file_path) as in_file:
-        
+
         for line in in_file:
-        
+
             # keeping track of current line for reporting any problems
             line_num += 1
 
@@ -306,15 +308,6 @@ def check_final_outputs():
     # getting list of files in output dir
     output_files_present = get_files_in_dir(final_outputs_dir)
 
-    # getting any that don't have one of the expected extensions 
-        # (This isn't perfect yet because as currently written it could miss if "counts.tsv" were missing,
-        # but "taxonomy-and-counts.tsv" were present. But trying to keep it robust to if there are multiple 
-        # primer sets, e.g. 16S and 18S, when we wouldn't know what the additional prefixes would be)
-    unexpected_outputs = []
-    for output_file in output_files_present:
-        if not any(output_file.endswith(entry) for entry in expected_final_outputs_or_suffixes):
-            report_failure("The '" + str(final_outputs_dir) + "' directory contained this unexpected output file: " + str(output_file))
-
     # making sure none of them are empty
     for output_file in output_files_present:
         check_for_file_and_contents(final_outputs_dir + output_file)
@@ -340,9 +333,10 @@ def check_for_processing_tar():
     with tarfile.open(processing_tar_file) as tar_obj:
         entries = tar_obj.getnames()
 
-    if entries[0] + "/Snakefile" not in entries:
-        report_failure("The '" + processing_tar_file + "' does not have a 'Snakefile' as expected.")
+    target_substring = str(args.output_prefix).rstrip("-") + "/Snakefile"
 
+    if not any(target_substring.lower() in string.lower() for string in entries):
+        report_failure("The '" + processing_tar_file + "' does not have a 'Snakefile' as expected.")
 
 if __name__ == "__main__":
     main()
