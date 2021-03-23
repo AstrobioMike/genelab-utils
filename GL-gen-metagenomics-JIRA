@@ -1,0 +1,276 @@
+#!/usr/bin/env python
+
+"""
+This is a program for generating the 2 JIRA tables needed for GeneLab metagenomics processed datasets for Curation.
+"""
+
+import os
+import sys
+import argparse
+import textwrap
+import pandas as pd
+import tarfile
+import zipfile
+import glob
+
+parser = argparse.ArgumentParser(description="This program generates the 2 JIRA tables needed for GeneLab metagenomics \
+                                             processed datasets to be passed onto Curation.\
+                                             Hard-coded variables that may need to be changed are at the top \
+                                             of the script. It is expected to be run after `GL-validate-metagenomics` and \
+                                             `GL-gen-metagenomics-readme` have been run successfully.")
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
+required.add_argument("-i", "--isa-zip", help='Appropriate ISA file for dataset (zipped)', action="store", required = True)
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+
+### hard-coded stuff we might want to change ###
+raw_reads_dir = "Raw_Data/"
+fastqc_dir = "FastQC_Outputs/"
+filtered_reads_dir = "Filtered_Sequence_Data/"
+assembly_based_dir = "Assembly-based_Processing/"
+assemblies_dir = "Assembly-based_Processing/assemblies/"
+genes_dir = "Assembly-based_Processing/predicted-genes/"
+annotations_and_tax_dir = "Assembly-based_Processing/annotations-and-taxonomy/"
+mapping_dir = "Assembly-based_Processing/read-mapping/"
+combined_output_dir = "Assembly-based_Processing/combined-outputs/"
+bins_dir = "Assembly-based_Processing/bins/"
+MAGs_dir = "Assembly-based_Processing/MAGs/"
+read_based_dir = "Read-based_Processing/"
+
+raw_R1_suffix = "_R1_raw.fastq.gz"
+raw_R2_suffix = "_R2_raw.fastq.gz"
+filtered_R1_suffix = "_R1_filtered.fastq.gz"
+filtered_R2_suffix = "_R2_filtered.fastq.gz"
+assembly_suffix = "-assembly.fasta"
+
+processing_tar_file = "processing_info.tar"
+
+################################################################################
+
+def main():
+
+    check_for_file_and_contents(args.isa_zip)
+
+    samples_in_ISA_order = get_samples_from_ISA(args.isa_zip)
+
+    read_counts_df = get_read_counts_from_raw_multiqc(samples_in_ISA_order)
+
+    gen_and_write_out_QC_metadata_tab(samples_in_ISA_order, read_counts_df)
+
+    gen_and_write_out_filenames_table(samples_in_ISA_order)
+
+################################################################################
+
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    """ print wrapper """
+
+    print(textwrap.fill(text, width=80, initial_indent="  ",
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def report_failure(message, color = "yellow"):
+    print("")
+    wprint(color_text(message, color))
+    print("\nJIRA-table generation failed.\n")
+    sys.exit(1)
+
+
+def check_for_file_and_contents(file_path):
+    """ used by check_fastq_files function """
+
+    if not os.path.exists(file_path):
+        report_failure("The expected file '" + str(file_path) + "' does not exist.")
+    if not os.path.getsize(file_path) > 0:
+        report_failure("The file '" + str(file_path) + "' is empty.")
+
+
+def get_samples_from_ISA(isa_file):
+    """ gets the sample names in their order from the ISA zip file """
+
+    zip_file = zipfile.ZipFile(isa_file)
+    isa_files = zip_file.namelist()
+
+    # getting wanted filename (those that start with "a_" seem to be what we want)
+    wanted_file_list = [item for item in isa_files if item.startswith("a_")]
+    if len(wanted_file_list) != 1:
+        report_failure("We couldn't find the correct table in the ISA object.")
+
+    wanted_file = wanted_file_list[0]
+
+    df = pd.read_csv(zip_file.open(wanted_file), sep = "\t", usecols = ["Sample Name"])
+    sample_IDs = df["Sample Name"].tolist()
+
+    return(sample_IDs)
+
+
+def get_read_counts_from_raw_multiqc(sample_names):
+
+    zip_file = zipfile.ZipFile(fastqc_dir + "raw_multiqc_data.zip")
+    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+    df.columns = ["sample", "counts"]
+    df.set_index("sample", inplace = True)
+
+    return(df)
+
+
+def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
+
+    # generating needed order of names row writing out table (which has full file names) and as they are in the multiqc table, for finding them
+    read_count_filename_list = []
+    multiqc_name_list = []
+
+    for sample in sample_names:
+
+        read_count_filename_list.append(sample + raw_R1_suffix)
+        read_count_filename_list.append(sample + raw_R2_suffix)
+        multiqc_name_list.append(sample + raw_R1_suffix.replace(".fastq.gz", ""))
+        multiqc_name_list.append(sample + raw_R2_suffix.replace(".fastq.gz", ""))
+
+    # getting counts
+    counts_list = []
+    for entry in multiqc_name_list:
+
+        counts_list.append(read_counts_df.at[entry, "counts"])
+
+    # making counts output table
+    out_df = pd.DataFrame()
+    out_df["File Name"] = read_count_filename_list
+    out_df["Number of Reads"] = counts_list
+
+    out_df.to_csv(args.GLDS_ID + "-QC-metadata.tsv", sep = "\t", float_format='%.0f', index = False)
+
+
+def gen_and_write_out_filenames_table(sample_names):
+
+    header_colnames = ["Sample Name", "README", raw_reads_dir.replace("_", " ").rstrip("/"), filtered_reads_dir.replace("_", " ").rstrip("/"),
+                      fastqc_dir.replace("_", " ").rstrip("/"), assemblies_dir.replace("_", " ").rstrip("/"), genes_dir.replace("_", " ").rstrip("/"),
+                      annotations_and_tax_dir.replace("_", " ").rstrip("/"), mapping_dir.replace("_", " ").rstrip("/"), bins_dir.replace("_", " ").rstrip("/"),
+                      MAGs_dir.replace("_", " ").rstrip("/"), combined_output_dir.replace("_", " ").rstrip("/"), read_based_dir.replace("_", " ").rstrip("/"),
+                      "Processing Info"]
+
+    # columns that don't change per sample or are just added to
+    readme_col = ["README.txt"]
+    fastqc_col = ["raw_multiqc_data.zip", "raw_multiqc_report.html.zip", "filtered_multiqc_data.zip", "filtered_multiqc_report.html.zip"]
+    if os.path.exists(assemblies_dir + "Failed-assemblies.tsv"):
+        assemblies_col = ["assembly-summaries.tsv", "Failed-assemblies.tsv"]
+    else:
+        assemblies_col = ["assembly-summaries.tsv"]
+
+    if os.path.exists(bins_dir + "bins-overview.tsv"):
+        bins_col = ["bins-overview.tsv"]
+        bins_dir_files = [file for file in os.listdir(bins_dir) if file.endswith(".fa")]
+    else:
+        bins_col = [""]
+
+    if os.path.exists(MAGs_dir + "MAGs-overview.tsv"):
+        MAGs_col = ["MAGs-overview.tsv"]
+        MAGs_dir_files = [file for file in os.listdir(MAGs_dir) if file.endswith(".fa")]
+    else:
+        MAGs_col = [""]
+
+    combined_outputs_col = ["Combined-gene-level-KO-function-coverages.tsv", "Combined-gene-level-KO-function-coverages-CPM.tsv",
+                            "Combined-gene-level-taxonomy-coverages.tsv", "Combined-gene-level-taxonomy-coverages-CPM.tsv",
+                            "Combined-contig-level-taxonomy-coverages.tsv", "Combined-contig-level-taxonomy-coverages-CPM.tsv"]
+
+    read_based_col = ["Gene-families.tsv", "Gene-families-grouped-by-taxa.tsv", "Gene-families-cpm.tsv", "Gene-families-KO-cpm.tsv",
+                      "Pathway-abundances.tsv", "Pathway-abundances-grouped-by-taxa.tsv", "Pathway-abundances-cpm.tsv", "Pathway-coverages.tsv",
+                      "Pathway-coverages-grouped-by-taxa.tsv", "Metaphlan-taxonomy.tsv"]
+
+    processing_info_col = ["processing_info.tar"]
+
+    # an empty row to add to keep the spacing Curation is used to
+    empty_row = pd.DataFrame.from_dict({header_colnames[0]: [""],
+                                          header_colnames[1]: [""],
+                                          header_colnames[2]: [""],
+                                          header_colnames[3]: [""],
+                                          header_colnames[4]: [""],
+                                          header_colnames[5]: [""],
+                                          header_colnames[6]: [""],
+                                          header_colnames[7]: [""],
+                                          header_colnames[8]: [""],
+                                          header_colnames[9]: [""],
+                                          header_colnames[10]: [""],
+                                          header_colnames[11]: [""],
+                                          header_colnames[12]: [""],
+                                          header_colnames[13]: [""]}, orient = "index").T
+
+    building_df = pd.DataFrame(columns = header_colnames)
+
+    for sample in sample_names:
+
+        curr_sample_name_col = [sample]
+
+        curr_raw_data_col = [sample + raw_R1_suffix, sample + raw_R2_suffix]
+
+        curr_filt_data_col = [sample + filtered_R1_suffix, sample + filtered_R2_suffix]
+
+        curr_assembly_col = [sample + assembly_suffix] + assemblies_col
+
+        curr_genes_col = [sample + "-genes.faa", sample + "-genes.fasta", sample + "-genes.gff"]
+
+        curr_annot_col = [sample + "-gene-coverage-annotation-and-tax.tsv", sample + "-contig-coverage-and-tax.tsv"]
+
+        if os.path.exists(mapping_dir + sample + "-mapping-info.txt"):
+            curr_read_mapping_col = [sample + ".bam", sample + "-mapping-info.txt", sample + "-metabat-assembly-depth.tsv"]
+        else:
+            curr_read_mapping_col = [sample + ".bam", sample + "-metabat-assembly-depth.tsv"]
+
+        if bins_col[0] == "bins-overview.tsv":
+            curr_bins_col = bins_col + [file for file in bins_dir_files if file.startswith(sample)]
+        else:
+            curr_bins_col = [""]
+
+        if MAGs_col[0] == "MAGs-overview.tsv":
+            curr_MAGs_col = MAGs_col + [file for file in MAGs_dir_files if file.startswith(sample)]
+        else:
+            curr_MAGs_col = [""]
+
+        curr_df = pd.DataFrame.from_dict({header_colnames[0]: curr_sample_name_col,
+                                          header_colnames[1]: readme_col,
+                                          header_colnames[2]: curr_raw_data_col,
+                                          header_colnames[3]: curr_filt_data_col,
+                                          header_colnames[4]: fastqc_col,
+                                          header_colnames[5]: curr_assembly_col,
+                                          header_colnames[6]: curr_genes_col,
+                                          header_colnames[7]: curr_annot_col,
+                                          header_colnames[8]: curr_read_mapping_col,
+                                          header_colnames[9]: curr_bins_col,
+                                          header_colnames[10]: curr_MAGs_col,
+                                          header_colnames[11]: combined_outputs_col,
+                                          header_colnames[12]: read_based_col,
+                                          header_colnames[13]: processing_info_col}, orient = "index").T
+
+        curr_df.fillna("", inplace = True)
+
+        building_df = pd.concat([building_df, curr_df, empty_row])
+
+    building_df.to_csv(args.GLDS_ID + "-associated-file-names.tsv", sep = "\t", index = False)
+
+if __name__ == "__main__":
+    main()
+
