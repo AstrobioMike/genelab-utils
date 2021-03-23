@@ -19,7 +19,8 @@ parser = argparse.ArgumentParser(description="This program validates GeneLab Ill
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store")
+required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
+required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store", required = True)
 parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
 
 
@@ -82,7 +83,7 @@ expected_log_file_suffixes = ["-CAT.log", "-assembly.log", "-bam-summarize-and-m
                               "-kofamscan.log", "-pileup.log", "-prodigal.log", "-humann3-run.log"]
 
 
-validation_log = "validation.log"
+validation_log = str(args.GLDS_ID) + "-metagenomics-validation.log"
 
 ################################################################################
 
