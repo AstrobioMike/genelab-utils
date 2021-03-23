@@ -102,7 +102,7 @@ def write_body(output):
     output.write("            {:<55} {:>0}".format("- *.faa", "- gene amino-acid sequences\n"))
     output.write("            {:<55} {:>0}".format("- *.fasta", "- gene nucleotide sequences\n"))
     output.write("            {:<55} {:>0}".format("- *.gff", "- predicted genes in general feature format\n\n"))
-    
+
     output.write("        {:<59} {:>0}".format("- " + str(annotations_and_tax_dir), "- per-sample Kegg Orthology (KO) annotations, taxonomy, and coverages\n"))
     output.write("            {:<55} {:>0}".format("- *-gene-coverage-annotation-tax.tsv", "- tables with gene coverage, annotation, and taxonomy info\n"))
     output.write("            {:<55} {:>0}".format("- *-contig-coverage-and-tax.tsv", "- tables with contig coverage and taxonomy info\n\n"))
@@ -114,12 +114,12 @@ def write_body(output):
 
     if os.path.exists(assembly_based_dir + bins_dir):
         output.write("        {:<59} {:>0}".format("- " + str(bins_dir), "- genomic bins recovered (if any)\n"))
-        output.write("            {:<55} {:>0}".format("- *.fa", "- fasta files of bins recovered\n"))
+        output.write("            {:<55} {:>0}".format("- *.fasta", "- fasta files of bins recovered\n"))
         output.write("            {:<55} {:>0}".format("- bins-overview.tsv", "- summary stats of bins recovered\n\n"))
 
     if os.path.exists(assembly_based_dir + MAGs_dir):
         output.write("        {:<59} {:>0}".format("- " + str(MAGs_dir), "- high-quality Metagenome-Assembled Genomes recovered (if any; > 90% est. comp., < 10% est. redundancy)\n"))
-        output.write("            {:<55} {:>0}".format("- *.fa", "- fasta files of MAGs\n"))
+        output.write("            {:<55} {:>0}".format("- *.fasta", "- fasta files of MAGs\n"))
         output.write("            {:<55} {:>0}".format("- MAGs-overview.tsv", "- summary stats of MAGs including GTDB taxonomy\n\n"))
 
     output.write("        {:<59} {:>0}".format("- " + str(combined_output_dir), "- summary outputs with all samples combined\n"))
