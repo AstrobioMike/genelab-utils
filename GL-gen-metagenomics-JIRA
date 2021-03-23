@@ -183,13 +183,13 @@ def gen_and_write_out_filenames_table(sample_names):
 
     if os.path.exists(bins_dir + "bins-overview.tsv"):
         bins_col = ["bins-overview.tsv"]
-        bins_dir_files = [file for file in os.listdir(bins_dir) if file.endswith(".fa")]
+        bins_dir_files = [file for file in os.listdir(bins_dir) if file.endswith(".fasta")]
     else:
         bins_col = [""]
 
     if os.path.exists(MAGs_dir + "MAGs-overview.tsv"):
         MAGs_col = ["MAGs-overview.tsv"]
-        MAGs_dir_files = [file for file in os.listdir(MAGs_dir) if file.endswith(".fa")]
+        MAGs_dir_files = [file for file in os.listdir(MAGs_dir) if file.endswith(".fasta")]
     else:
         MAGs_col = [""]
 
