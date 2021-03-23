@@ -20,12 +20,14 @@ parser = argparse.ArgumentParser(description="This program generates the 2 JIRA 
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store")
-required.add_argument("-i", "--isa-zip", help='Appropriate ISA file for dataset (zipped)', action="store")
+required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
+required.add_argument("-i", "--isa-zip", help='Appropriate ISA file for dataset (zipped)', action="store", required = True)
 parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
                     therefore there are no trimmed sequence data.", action="store_true")
 parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
 parser.add_argument("--type", help='Specify if ASVs or OTUs (default: "ASVs")', action="store", choices = ["ASVs", "OTUs"], default = "ASVs")
+parser.add_argument("--map", help='Mapping file if samples come from more than one primer set (tab-delimited, first column holds sample IDs, second column holds the filename prefix of the outputs specific to that sample), ', action="store")
+
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -59,15 +61,20 @@ def main():
 
     check_for_file_and_contents(args.isa_zip)
 
-    check_expected_directories()
-
     samples_in_JIRA_order = get_samples_from_JIRA(args.isa_zip)
 
-    read_counts_df = get_read_counts_from_raw_multiqc(samples_in_JIRA_order)
+    if args.map:
+        map_tab = pd.read_csv(args.map, sep = "\t", names = ["sample", "prefix"])
+        map_tab.set_index("sample", inplace = True)
+
+    else:
+        map_tab = None
+
+    read_counts_df = get_read_counts_from_raw_multiqc(samples_in_JIRA_order, map_tab)
 
     gen_and_write_out_QC_metadata_tab(samples_in_JIRA_order, read_counts_df)
 
-    gen_and_write_out_filenames_table(samples_in_JIRA_order)
+    gen_and_write_out_filenames_table(samples_in_JIRA_order, map_tab)
 
     # with open(args.output, "w") as output:
 
@@ -108,14 +115,6 @@ def report_failure(message, color = "yellow"):
     sys.exit(1)
 
 
-def check_expected_directories():
-    """ checks expected directories exist """
-
-    if not os.path.isdir(fastqc_dir):
-
-        report_failure("The directory '" + str(fastqc_dir) + "' was expected but not found.")
-
-
 def check_for_file_and_contents(file_path):
     """ used by check_fastq_files function """
 
@@ -144,13 +143,43 @@ def get_samples_from_JIRA(isa_file):
     return(sample_IDs)
 
 
-def get_read_counts_from_raw_multiqc(sample_names):
+def get_read_counts_from_raw_multiqc(sample_names, mapping_tab):
 
-    zip_file = zipfile.ZipFile(fastqc_dir + "raw_multiqc_data.zip")
-    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
-    df.columns = ["sample", "counts"]
-    df.set_index("sample", inplace = True)
-    return(df)
+    # these are in multiple files if there was a mapping input table
+    if isinstance(mapping_tab, pd.DataFrame):
+        unique_prefixes = mapping_tab.prefix.unique()
+
+        # starting list to hold all dataframes we'll read in
+        df_list = []
+
+        # working through each one
+        for prefix in unique_prefixes:
+
+            curr_file_path = fastqc_dir + prefix + "-raw_multiqc_data.zip"
+
+            # making sure there are multiqc files for each unique prefix given in the mapping table
+            check_for_file_and_contents(curr_file_path)
+
+            # reading in
+            zip_file = zipfile.ZipFile(curr_file_path)
+            curr_df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+            curr_df.columns = ["sample", "counts"]
+            curr_df.set_index("sample", inplace = True)
+
+            # adding to list
+            df_list.append(curr_df)
+
+        # combining tables
+        df = pd.concat(df_list, axis = 0)
+
+        return(df)
+
+    else:
+        zip_file = zipfile.ZipFile(fastqc_dir + "raw_multiqc_data.zip")
+        df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+        df.columns = ["sample", "counts"]
+        df.set_index("sample", inplace = True)
+        return(df)
 
 
 def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
@@ -190,26 +219,34 @@ def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
     out_df.to_csv(args.GLDS_ID + "-QC-metadata.tsv", sep = "\t", float_format='%.0f', index = False)
 
 
-def gen_and_write_out_filenames_table(sample_names):
+def get_prefix_from_map(sample_name, mapping_tab):
+
+    # returning empty string if no mapping
+    if not isinstance(mapping_tab, pd.DataFrame):
+        return("")
+    else:
+        return(mapping_tab.at[sample_name, "prefix"] + "-")
+
+def gen_and_write_out_filenames_table(sample_names, mapping_tab):
 
     with open(args.GLDS_ID + "-associated-file-names.tsv", "w") as output:
 
         # header
         if not args.primers_already_trimmed:
 
-            output.write("Sample Name" + "\t" "README" + "\t" + raw_reads_dir.replace("_", " ").rstrip("/") + 
-                "\t" + trimmed_reads_dir.replace("_", " ").rstrip("/") + 
-                "\t" + filtered_reads_dir.replace("_", " ").rstrip("/") + 
-                "\t" + fastqc_dir.replace("_", " ").rstrip("/") + 
-                "\t" + final_outputs_dir.replace("_", " ").rstrip("/") + 
+            output.write("Sample Name" + "\t" "README" + "\t" + raw_reads_dir.replace("_", " ").rstrip("/") +
+                "\t" + trimmed_reads_dir.replace("_", " ").rstrip("/") +
+                "\t" + filtered_reads_dir.replace("_", " ").rstrip("/") +
+                "\t" + fastqc_dir.replace("_", " ").rstrip("/") +
+                "\t" + final_outputs_dir.replace("_", " ").rstrip("/") +
                 "\t" + "Processing Info" + "\n")
 
         else:
 
-            output.write("Sample Name" + "\t" "README" + "\t" + raw_reads_dir.replace("_", " ").rstrip("/") + 
-                "\t" + filtered_reads_dir.replace("_", " ").rstrip("/") + 
-                "\t" + fastqc_dir.replace("_", " ").rstrip("/") + 
-                "\t" + final_outputs_dir.replace("_", " ").rstrip("/") + 
+            output.write("Sample Name" + "\t" "README" + "\t" + raw_reads_dir.replace("_", " ").rstrip("/") +
+                "\t" + filtered_reads_dir.replace("_", " ").rstrip("/") +
+                "\t" + fastqc_dir.replace("_", " ").rstrip("/") +
+                "\t" + final_outputs_dir.replace("_", " ").rstrip("/") +
                 "\t" + "Processing Info" + "\n")
 
 
@@ -218,130 +255,130 @@ def gen_and_write_out_filenames_table(sample_names):
         if not args.single_ended:
 
             # this changes what's written out as there would be no primer-trimmed files or column for them
-            if not args.primers_already_trimmed:            
-            
+            if not args.primers_already_trimmed:
+
                 for sample in sample_names:
 
-                    output.write(str(sample) + "\t" + "README.txt" + "\t" + 
-                        sample + raw_R1_suffix + "\t" + sample + primer_trimmed_R1_suffix + "\t" + 
-                        sample + filtered_R1_suffix + "\t" + 
-                        "raw_multiqc_data.zip" + "\t" + args.type + ".fasta" + "\t" +
-                        processing_tar_file + 
+                    output.write(str(sample) + "\t" + "README.txt" + "\t" +
+                        sample + raw_R1_suffix + "\t" + sample + primer_trimmed_R1_suffix + "\t" +
+                        sample + filtered_R1_suffix + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "raw_multiqc_data.zip" + "\t" + get_prefix_from_map(sample, mapping_tab) + args.type + ".fasta" + "\t" +
+                        processing_tar_file +
                         "\n" +
-                        "\t" + "\t" + 
-                        sample + raw_R2_suffix + "\t" + sample + primer_trimmed_R2_suffix + "\t" + 
-                        sample + filtered_R2_suffix + "\t" + 
-                        "raw_multiqc_report.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "\t" + "\t" +
+                        sample + raw_R2_suffix + "\t" + sample + primer_trimmed_R2_suffix + "\t" +
+                        sample + filtered_R2_suffix + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "raw_multiqc_report.html.zip" + "\t" + get_prefix_from_map(sample, mapping_tab) + "counts.tsv" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" +
-                        "trimmed-read-counts.tsv" + "\t" +
-                        "filtered-read-counts.tsv" + "\t" +
-                        "filtered_multiqc_data.zip" + "\t" +
-                        "read-count-tracking.tsv" + "\t" + "" +
-                        "\n" + 
-                        "\t" + "\t" + "\t" + "cutadapt.log" + "\t" + "\t" +
-                        "filtered_multiqc_report.html.zip" + "\t" +
-                        "taxonomy-and-counts.biom.zip" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "trimmed-read-counts.tsv" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered-read-counts.tsv" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered_multiqc_data.zip" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "read-count-tracking.tsv" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" + get_prefix_from_map(sample, mapping_tab) + "cutadapt.log" + "\t" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered_multiqc_report.html.zip" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy-and-counts.biom.zip" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "taxonomy.tsv" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy.tsv" + "\t" + "" +
                         "\n"
                         "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "taxonomy-and-counts.tsv" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy-and-counts.tsv" + "\t" + "" +
                         "\n" + "\n")
 
             else:
 
                 for sample in sample_names:
 
-                    output.write(str(sample) + "\t" + "README.txt" + "\t" + 
-                        sample + raw_R1_suffix + "\t" + 
-                        sample + filtered_R1_suffix + "\t" + 
-                        "raw_multiqc_data.zip" + "\t" + args.type + ".fasta" + "\t" +
-                        processing_tar_file + 
+                    output.write(str(sample) + "\t" + "README.txt" + "\t" +
+                        sample + raw_R1_suffix + "\t" +
+                        sample + filtered_R1_suffix + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "raw_multiqc_data.zip" + "\t" + get_prefix_from_map(sample, mapping_tab) + args.type + ".fasta" + "\t" +
+                        processing_tar_file +
                         "\n" +
-                        "\t" + "\t" + 
-                        sample + raw_R2_suffix + "\t" +  
-                        sample + filtered_R2_suffix + "\t" + 
-                        "raw_multiqc_report.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "\t" + "\t" +
+                        sample + raw_R2_suffix + "\t" +
+                        sample + filtered_R2_suffix + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "raw_multiqc_report.html.zip" + "\t" + get_prefix_from_map(sample, mapping_tab) +"counts.tsv" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" +
-                        "filtered-read-counts.tsv" + "\t" +
-                        "filtered_multiqc_data.zip" + "\t" +
-                        "read-count-tracking.tsv" + "\t" + "" +
-                        "\n" + 
+                        get_prefix_from_map(sample, mapping_tab) + "filtered-read-counts.tsv" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered_multiqc_data.zip" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "read-count-tracking.tsv" + "\t" + "" +
+                        "\n" +
                         "\t" + "\t" + "\t" + "\t" +
-                        "filtered_multiqc_report.html.zip" + "\t" +
-                        "taxonomy-and-counts.biom.zip" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered_multiqc_report.html.zip" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy-and-counts.biom.zip" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "taxonomy.tsv" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy.tsv" + "\t" + "" +
                         "\n"
                         "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "taxonomy-and-counts.tsv" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy-and-counts.tsv" + "\t" + "" +
                         "\n" + "\n")
 
         # now single-end
         else:
 
             # this changes what's written out as there would be no primer-trimmed files or column for them
-            if not args.primers_already_trimmed:            
-            
+            if not args.primers_already_trimmed:
+
                 for sample in sample_names:
 
-                    output.write(str(sample) + "\t" + "README.txt" + "\t" + 
-                        sample + raw_suffix + "\t" + sample + primer_trimmed_suffix + "\t" + 
-                        sample + filtered_suffix + "\t" + 
-                        "raw_multiqc_data.zip" + "\t" + args.type + ".fasta" + "\t" +
-                        processing_tar_file + 
+                    output.write(str(sample) + "\t" + "README.txt" + "\t" +
+                        sample + raw_suffix + "\t" + sample + primer_trimmed_suffix + "\t" +
+                        sample + filtered_suffix + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "raw_multiqc_data.zip" + "\t" + get_prefix_from_map(sample, mapping_tab) + args.type + ".fasta" + "\t" +
+                        processing_tar_file +
                         "\n" +
-                        "\t" + "\t" + "\t" + 
-                        "trimmed-read-counts.tsv" + "\t" +
-                        "filtered-read-counts.tsv" + "\t" +
-                        "raw_multiqc_report.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        "\t" + "\t" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "trimmed-read-counts.tsv" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered-read-counts.tsv" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "raw_multiqc_report.html.zip" + "\t" + get_prefix_from_map(sample, mapping_tab) + "counts.tsv" + "\t" + "" +
                         "\n" +
-                        "\t" + "\t" + "\t" + "\t" + "\t" 
-                        "filtered_multiqc_data.zip" + "\t" +
-                        "read-count-tracking.tsv" + "\t" + "" +
-                        "\n" + 
                         "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "filtered_multiqc_report.html.zip" + "\t" +
-                        "taxonomy-and-counts.biom.zip" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered_multiqc_data.zip" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "read-count-tracking.tsv" + "\t" + "" +
+                        "\n" +
+                        "\t" + "\t" + "\t" + "\t" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered_multiqc_report.html.zip" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy-and-counts.biom.zip" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "taxonomy.tsv" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy.tsv" + "\t" + "" +
                         "\n"
                         "\t" + "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "taxonomy-and-counts.tsv" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy-and-counts.tsv" + "\t" + "" +
                         "\n" + "\n")
 
             else:
 
                 for sample in sample_names:
 
-                    output.write(str(sample) + "\t" + "README.txt" + "\t" + 
-                        sample + raw_suffix + "\t" +  
-                        sample + filtered_suffix + "\t" + 
-                        "raw_multiqc_data.zip" + "\t" + args.type + ".fasta" + "\t" +
-                        processing_tar_file + 
+                    output.write(str(sample) + "\t" + "README.txt" + "\t" +
+                        sample + raw_suffix + "\t" +
+                        sample + filtered_suffix + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "raw_multiqc_data.zip" + "\t" + get_prefix_from_map(sample, mapping_tab) + args.type + ".fasta" + "\t" +
+                        processing_tar_file +
                         "\n" +
                         "\t" + "\t" + "\t" +
-                        "filtered-read-counts.tsv" + "\t" +
-                        "raw_multiqc_report.html.zip" + "\t" + "counts.tsv" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered-read-counts.tsv" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "raw_multiqc_report.html.zip" + "\t" + get_prefix_from_map(sample, mapping_tab) + "counts.tsv" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" +
-                        "filtered_multiqc_data.zip" + "\t" +
-                        "read-count-tracking.tsv" + "\t" + "" +
-                        "\n" + 
+                        get_prefix_from_map(sample, mapping_tab) + "filtered_multiqc_data.zip" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "read-count-tracking.tsv" + "\t" + "" +
+                        "\n" +
                         "\t" + "\t" + "\t" + "\t" +
-                        "filtered_multiqc_report.html.zip" + "\t" +
-                        "taxonomy-and-counts.biom.zip" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "filtered_multiqc_report.html.zip" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy-and-counts.biom.zip" + "\t" + "" +
                         "\n" +
                         "\t" + "\t" + "\t" + "\t" + "\t" +
-                        "taxonomy.tsv" + "\t" + "" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy.tsv" + "\t" + "" +
                         "\n"
-                        "\t" + "\t" + "\t" + "\t" + "\t" + 
-                        "taxonomy-and-counts.tsv" + "\t" + "" +
+                        "\t" + "\t" + "\t" + "\t" + "\t" +
+                        get_prefix_from_map(sample, mapping_tab) + "taxonomy-and-counts.tsv" + "\t" + "" +
                         "\n" + "\n")
 
 
