@@ -97,16 +97,18 @@ def write_body(output, processing_tar_contents):
     # outputs
     output.write("    {:<41} {:>0}".format("- " + str(final_outputs_dir), "- primary output files (may or may not have additional prefix)\n"))
     output.write("        {:<37} {:>0}".format("- *.fasta", "- fasta file of recovered sequences\n"))
-    output.write("        {:<37} {:>0}".format("- counts.tsv", "- count table of sequences across samples\n"))
-    output.write("        {:<37} {:>0}".format("- taxonomy.tsv", "- assigned taxonomy of recovered sequences\n"))
-    output.write("        {:<37} {:>0}".format("- taxonomy-and-count.tsv", "- combined table of counts and taxonomy\n"))
-    output.write("        {:<37} {:>0}".format("- taxonomy-and-count.biom.zip", "- biom-formatted output of counts and taxonomy\n"))
-    output.write("        {:<37} {:>0}".format("- read-count-tracking.tsv", "- read counts at each processing step\n\n"))
-    
+    output.write("        {:<37} {:>0}".format("- *counts.tsv", "- count table of sequences across samples\n"))
+    output.write("        {:<37} {:>0}".format("- *taxonomy.tsv", "- assigned taxonomy of recovered sequences\n"))
+    output.write("        {:<37} {:>0}".format("- *taxonomy-and-count.tsv", "- combined table of counts and taxonomy\n"))
+    output.write("        {:<37} {:>0}".format("- *taxonomy-and-count.biom.zip", "- biom-formatted output of counts and taxonomy\n"))
+    output.write("        {:<37} {:>0}".format("- *read-count-tracking.tsv", "- read counts at each processing step\n\n"))
+
     # processing info
     output.write("    {:<41} {:>0}".format("- " + str(processing_tar_file), "- tarball holding info related to processing\n"))
     for item in processing_tar_contents:
-        output.write("        - " + str(item) + "\n")
+        num_levels = item.count("/")
+        num_spaces = num_levels * 4
+        output.write("        " + " " * num_spaces + "- " + str(item) + "\n")
 
 
 # setting some colors
@@ -171,8 +173,10 @@ def get_processing_tar_contents():
     check_for_file_and_contents(processing_tar_file)
 
     with tarfile.open(processing_tar_file) as tar_obj:
-        entries = [os.path.basename(entry) for entry in tar_obj.getnames()][1:]
-        entries.sort(reverse = True)
+#        entries = [os.path.basename(entry) for entry in tar_obj.getnames()][1:]
+#        entries = [os.path.basename(entry) for entry in tar_obj.getnames()]
+        entries = tar_obj.getnames()
+        entries.sort()
 
     return(entries)
 
