@@ -32,6 +32,8 @@ args = parser.parse_args()
 
 
 ### hard-coded stuff we might want to change ###
+file_prefix = args.GLDS_ID + "_GMetagenomics_"
+
 raw_reads_dir = "Raw_Data/"
 fastqc_dir = "FastQC_Outputs/"
 filtered_reads_dir = "Filtered_Sequence_Data/"
@@ -167,107 +169,120 @@ def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
 
 def gen_and_write_out_filenames_table(sample_names):
 
-    header_colnames = ["Sample Name", "README", raw_reads_dir.replace("_", " ").rstrip("/"), filtered_reads_dir.replace("_", " ").rstrip("/"),
-                      fastqc_dir.replace("_", " ").rstrip("/"), assemblies_dir.replace("_", " ").rstrip("/"), genes_dir.replace("_", " ").rstrip("/"),
-                      annotations_and_tax_dir.replace("_", " ").rstrip("/"), mapping_dir.replace("_", " ").rstrip("/"), bins_dir.replace("_", " ").rstrip("/"),
-                      MAGs_dir.replace("_", " ").rstrip("/"), combined_output_dir.replace("_", " ").rstrip("/"), read_based_dir.replace("_", " ").rstrip("/"),
-                      "Processing Info"]
+    header_colnames = ["Sample Name", "Parameter Value[README]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + raw_reads_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + filtered_reads_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + fastqc_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + assemblies_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + genes_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + annotations_and_tax_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + mapping_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + bins_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + MAGs_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + combined_output_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + read_based_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[Processing Info]", "Term Source REF", "Term Accession Number"]
 
-    # columns that don't change per sample or are just added to
-    readme_col = ["README.txt"]
-    fastqc_col = ["raw_multiqc_data.zip", "raw_multiqc_report.html.zip", "filtered_multiqc_data.zip", "filtered_multiqc_report.html.zip"]
+    # entries that don't change per sample
+    readme = file_prefix + "README.txt"
+    fastqc = [file_prefix + "raw_multiqc_data.zip", file_prefix + "raw_multiqc_report.html.zip", file_prefix + "filtered_multiqc_data.zip", file_prefix + "filtered_multiqc_report.html.zip"]
+
     if os.path.exists(assemblies_dir + "Failed-assemblies.tsv"):
-        assemblies_col = ["assembly-summaries.tsv", "Failed-assemblies.tsv"]
+        assembly_files = [file_prefix + "assembly-summaries.tsv", file_prefix + "Failed-assemblies.tsv"]
     else:
-        assemblies_col = ["assembly-summaries.tsv"]
+        assembly_files = [file_prefix + "assembly-summaries.tsv"]
 
     if os.path.exists(bins_dir + "bins-overview.tsv"):
-        bins_col = ["bins-overview.tsv"]
+        bins_overview = [file_prefix + "bins-overview.tsv"]
         bins_dir_files = [file for file in os.listdir(bins_dir) if file.endswith(".fasta")]
     else:
-        bins_col = [""]
+        bins_overview = [""]
 
     if os.path.exists(MAGs_dir + "MAGs-overview.tsv"):
-        MAGs_col = ["MAGs-overview.tsv"]
+        MAGs_overview = [file_prefix + "MAGs-overview.tsv"]
         MAGs_dir_files = [file for file in os.listdir(MAGs_dir) if file.endswith(".fasta")]
     else:
-        MAGs_col = [""]
+        MAGs_overview = [""]
 
-    combined_outputs_col = ["Combined-gene-level-KO-function-coverages.tsv", "Combined-gene-level-KO-function-coverages-CPM.tsv",
-                            "Combined-gene-level-taxonomy-coverages.tsv", "Combined-gene-level-taxonomy-coverages-CPM.tsv",
-                            "Combined-contig-level-taxonomy-coverages.tsv", "Combined-contig-level-taxonomy-coverages-CPM.tsv"]
+    combined_outputs = [file_prefix + "Combined-gene-level-KO-function-coverages.tsv", file_prefix + "Combined-gene-level-KO-function-coverages-CPM.tsv",
+                            file_prefix + "Combined-gene-level-taxonomy-coverages.tsv", file_prefix + "Combined-gene-level-taxonomy-coverages-CPM.tsv",
+                            file_prefix + "Combined-contig-level-taxonomy-coverages.tsv", file_prefix + "Combined-contig-level-taxonomy-coverages-CPM.tsv"]
 
-    read_based_col = ["Gene-families.tsv", "Gene-families-grouped-by-taxa.tsv", "Gene-families-cpm.tsv", "Gene-families-KO-cpm.tsv",
-                      "Pathway-abundances.tsv", "Pathway-abundances-grouped-by-taxa.tsv", "Pathway-abundances-cpm.tsv", "Pathway-coverages.tsv",
-                      "Pathway-coverages-grouped-by-taxa.tsv", "Metaphlan-taxonomy.tsv"]
+    read_based_outputs = [file_prefix + "Gene-families.tsv", file_prefix + "Gene-families-grouped-by-taxa.tsv", file_prefix + "Gene-families-cpm.tsv", file_prefix + "Gene-families-KO-cpm.tsv",
+                      file_prefix + "Pathway-abundances.tsv", file_prefix + "Pathway-abundances-grouped-by-taxa.tsv", file_prefix + "Pathway-abundances-cpm.tsv", file_prefix + "Pathway-coverages.tsv",
+                      file_prefix + "Pathway-coverages-grouped-by-taxa.tsv", file_prefix + "Metaphlan-taxonomy.tsv"]
 
-    processing_info_col = ["processing_info.tar"]
-
-    # an empty row to add to keep the spacing Curation is used to
-    empty_row = pd.DataFrame.from_dict({header_colnames[0]: [""],
-                                          header_colnames[1]: [""],
-                                          header_colnames[2]: [""],
-                                          header_colnames[3]: [""],
-                                          header_colnames[4]: [""],
-                                          header_colnames[5]: [""],
-                                          header_colnames[6]: [""],
-                                          header_colnames[7]: [""],
-                                          header_colnames[8]: [""],
-                                          header_colnames[9]: [""],
-                                          header_colnames[10]: [""],
-                                          header_colnames[11]: [""],
-                                          header_colnames[12]: [""],
-                                          header_colnames[13]: [""]}, orient = "index").T
+    processing_info = file_prefix + "processing_info.tar"
 
     building_df = pd.DataFrame(columns = header_colnames)
 
     for sample in sample_names:
 
-        curr_sample_name_col = [sample]
+        curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
 
-        curr_raw_data_col = [sample + raw_R1_suffix, sample + raw_R2_suffix]
+        curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix]
 
-        curr_filt_data_col = [sample + filtered_R1_suffix, sample + filtered_R2_suffix]
+        # only adding file to list if it exists and isn't empty (easier for curation this way)
+        curr_path = assemblies_dir + sample + assembly_suffix
 
-        curr_assembly_col = [sample + assembly_suffix] + assemblies_col
-
-        curr_genes_col = [sample + "-genes.faa", sample + "-genes.fasta", sample + "-genes.gff"]
-
-        curr_annot_col = [sample + "-gene-coverage-annotation-and-tax.tsv", sample + "-contig-coverage-and-tax.tsv"]
-
-        if os.path.exists(mapping_dir + sample + "-mapping-info.txt"):
-            curr_read_mapping_col = [sample + ".bam", sample + "-mapping-info.txt", sample + "-metabat-assembly-depth.tsv"]
+        if os.path.exists(curr_path) and os.path.getsize(curr_path) > 0:
+            curr_assembly = [file_prefix + sample + assembly_suffix] + assembly_files
         else:
-            curr_read_mapping_col = [sample + ".bam", sample + "-metabat-assembly-depth.tsv"]
+            curr_assembly = [""]
 
-        if bins_col[0] == "bins-overview.tsv":
-            curr_bins_col = bins_col + [file for file in bins_dir_files if file.startswith(sample)]
+        # only adding file to list if it exists and isn't empty (easier for curation this way)
+        curr_genes = []
+        for ext in ["-genes.faa", "-genes.fasta", "-genes.gff"]:
+            curr_path = genes_dir + sample + ext
+            
+            if os.path.exists(curr_path) and os.path.getsize(curr_path) > 0:
+                curr_genes.append(file_prefix + sample + ext)
+
+        # adding empty value if all 3 missing (which i don't think happens as the gff has content either way)
+        if len(curr_genes) == 0:
+            curr_genes = [""]
+
+        # these have headers even if no data for a sample, so no complications about being empty
+        curr_annots = [file_prefix + sample + "-gene-coverage-annotation-and-tax.tsv", file_prefix + sample + "-contig-coverage-and-tax.tsv"]
+
+        # only adding file to list if it exists and isn't empty (easier for curation this way)
+        curr_read_mapping = []
+        for ext in [".bam", "-mapping-info.txt", "-metabat-assembly-depth.tsv"]:
+            curr_path = mapping_dir + sample + ext
+
+            if os.path.exists(curr_path) and os.path.getsize(curr_path) > 0:
+                curr_read_mapping.append(file_prefix + sample + ext)
+
+        # adding empty value if all 3 missing
+        if len(curr_read_mapping) == 0:
+            curr_read_mapping = [""]
+
+        if bins_overview[0] == file_prefix + "bins-overview.tsv":
+            curr_bins = bins_overview + [file_prefix + file for file in bins_dir_files if file.startswith(sample)]
         else:
-            curr_bins_col = [""]
+            curr_bins = [""]
 
-        if MAGs_col[0] == "MAGs-overview.tsv":
-            curr_MAGs_col = MAGs_col + [file for file in MAGs_dir_files if file.startswith(sample)]
+        if MAGs_overview[0] == file_prefix + "MAGs-overview.tsv":
+            curr_MAGs = MAGs_overview + [file_prefix + file for file in MAGs_dir_files if file.startswith(sample)]
         else:
-            curr_MAGs_col = [""]
+            curr_MAGs = [""]
 
-        curr_df = pd.DataFrame.from_dict({header_colnames[0]: curr_sample_name_col,
-                                          header_colnames[1]: readme_col,
-                                          header_colnames[2]: curr_raw_data_col,
-                                          header_colnames[3]: curr_filt_data_col,
-                                          header_colnames[4]: fastqc_col,
-                                          header_colnames[5]: curr_assembly_col,
-                                          header_colnames[6]: curr_genes_col,
-                                          header_colnames[7]: curr_annot_col,
-                                          header_colnames[8]: curr_read_mapping_col,
-                                          header_colnames[9]: curr_bins_col,
-                                          header_colnames[10]: curr_MAGs_col,
-                                          header_colnames[11]: combined_outputs_col,
-                                          header_colnames[12]: read_based_col,
-                                          header_colnames[13]: processing_info_col}, orient = "index").T
+        curr_row_as_list = [sample, readme, "", "",
+                            ", ".join(curr_raw_data), "", "",
+                            ", ".join(curr_filt_data),"", "",
+                            ", ".join(fastqc), "", "",
+                            ", ".join(curr_assembly), "", "",
+                            ", ".join(curr_genes), "", "",
+                            ", ".join(curr_annots), "", "",
+                            ", ".join(curr_read_mapping), "", "",
+                            ", ".join(curr_bins), "", "",
+                            ", ".join(curr_MAGs), "", "",
+                            ", ".join(combined_outputs), "", "",
+                            ", ".join(read_based_outputs), "", "",
+                            processing_info, "", ""] 
 
-        curr_df.fillna("", inplace = True)
-
-        building_df = pd.concat([building_df, curr_df, empty_row])
+        # adding to building dataframe
+        building_df.loc[len(building_df)] = curr_row_as_list
 
     building_df.to_csv(args.GLDS_ID + "-associated-file-names.tsv", sep = "\t", index = False)
 
