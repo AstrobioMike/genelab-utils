@@ -173,6 +173,7 @@ def gen_and_write_out_filenames_table(sample_names):
                        "Parameter Value[" + raw_reads_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + filtered_reads_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + fastqc_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[" + assembly_based_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + assemblies_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + genes_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + annotations_and_tax_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
@@ -186,6 +187,7 @@ def gen_and_write_out_filenames_table(sample_names):
     # entries that don't change per sample
     readme = file_prefix + "README.txt"
     fastqc = [file_prefix + "raw_multiqc_data.zip", file_prefix + "raw_multiqc_report.html.zip", file_prefix + "filtered_multiqc_data.zip", file_prefix + "filtered_multiqc_report.html.zip"]
+    assembly_overview_tab = file_prefix + "Assembly-based-processing-overview.tsv"
 
     if os.path.exists(assemblies_dir + "Failed-assemblies.tsv"):
         assembly_files = [file_prefix + "assembly-summaries.tsv", file_prefix + "Failed-assemblies.tsv"]
@@ -271,6 +273,7 @@ def gen_and_write_out_filenames_table(sample_names):
                             ", ".join(curr_raw_data), "", "",
                             ", ".join(curr_filt_data),"", "",
                             ", ".join(fastqc), "", "",
+                            assembly_overview_tab, "", "",
                             ", ".join(curr_assembly), "", "",
                             ", ".join(curr_genes), "", "",
                             ", ".join(curr_annots), "", "",

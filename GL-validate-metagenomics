@@ -67,13 +67,14 @@ expected_assembly_combined_outputs = ["Combined-contig-level-taxonomy-coverages-
                                       "Combined-gene-level-taxonomy-coverages-CPM.tsv", "Combined-contig-level-taxonomy-coverages.tsv",
                                       "Combined-gene-level-KO-function-coverages.tsv", "Combined-gene-level-taxonomy-coverages.tsv"]
 
+assembly_based_overview_table = assembly_based_dir + "Assembly-based-processing-overview.tsv"
+
 expected_read_based_outputs = ["Gene-families-KO-cpm.tsv", "Gene-families-cpm.tsv", "Gene-families-grouped-by-taxa.tsv",
                                "Gene-families.tsv", "Metaphlan-taxonomy.tsv", "Pathway-abundances-cpm.tsv",
                                "Pathway-abundances-grouped-by-taxa.tsv", "Pathway-abundances.tsv",
                                "Pathway-coverages-grouped-by-taxa.tsv", "Pathway-coverages.tsv"]
 
 expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
-
 
 processing_tar_file = "processing_info.tar"
 
@@ -102,6 +103,8 @@ def main():
     successful_assemblies_list = get_successful_assemblies(sample_names, failed_assemblies_list)
 
     check_assembly_based_outputs(sample_names, failed_assemblies_list, successful_assemblies_list)
+
+    check_assembly_based_overview_table(sample_names, assembly_based_overview_table)
 
     check_read_based_outputs(expected_read_based_outputs)
 
@@ -484,6 +487,27 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
             if not os.path.exists(MAGs_summary_path):
 
                 report_failure("The MAGs summary file, " + str(MAGs_summary_path) + ", is expected but was not found.")
+
+
+def check_assembly_based_overview_table(expected_samples, overview_table_path):
+    """ makes sure the output table exists and all input samples are in it """
+
+    # first making sure it exists and is not empty
+    check_for_file_and_contents(overview_table_path)
+
+    # now making sure all samples are in there
+    # reading in table and getting sample IDs in list
+    overview_tab = pd.read_csv(overview_table_path, sep = "\t")
+    samples_in_tab = overview_tab['Sample_ID'].tolist()
+
+    missing_sample_IDs = []
+
+    for sample in expected_samples:
+        if sample not in samples_in_tab:
+            missing_sample_IDs.append(sample)
+
+    if len(missing_sample_IDs) > 0:
+        report_failure("The assembly overview table, '" + overview_table_path + "', doesn't have all the samples expected to be there.")
 
 
 def check_read_based_outputs(filenames):

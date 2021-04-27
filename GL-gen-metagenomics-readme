@@ -93,6 +93,8 @@ def write_body(output):
     # outputs
     output.write("    {:<63} {:>0}".format("- " + str(assembly_based_dir), "- results generated from assembly-based approach\n\n"))
 
+    output.write("        {:<59} {:>0}".format("- " + str("Assembly-based-processing-overview.tsv"), "- Assembly-based overview per sample\n\n"))
+    
     output.write("        {:<59} {:>0}".format("- " + str(assemblies_dir), "- per-sample assembly files and info\n"))
     output.write("            {:<55} {:>0}".format("- *-assembly.fasta", "- fasta files of individual sample assemblies\n"))
     output.write("            {:<55} {:>0}".format("- assembly-summaries.tsv", "- table of all assemblies' summary statistics\n"))
