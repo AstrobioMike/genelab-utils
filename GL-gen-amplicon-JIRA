@@ -272,9 +272,9 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
 
         curr_read_count = get_read_count_from_df(sample, read_count_tab)
 
-        curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, file_prefix + sample + primer_trimmed_R2_suffix]
+        curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, file_prefix + sample + primer_trimmed_R2_suffix, file_prefix + "trimmed-read-counts.tsv", file_prefix + "cutadapt.log"]
 
-        curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix]
+        curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix, file_prefix + "filtered-read-counts.tsv"]
 
         curr_row_as_list = [sample, readme, "", "",
                             ", ".join(curr_raw_data), "", "",
