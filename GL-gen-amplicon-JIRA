@@ -61,14 +61,8 @@ processing_tar_file = "processing_info.tar"
 def main():
 
     ### temporary ###
-    if args.single_ended:
-        report_failure("This program is not yet equipped to handle single-ended amplicon data :/ Get to it, Mike!")
-
     if args.primers_already_trimmed:
         report_failure("This program is not yet equipped to handle data where the primers were already trimmed :/ Get to it, Mike!")
-
-    if args.type == "OTUs":
-        report_failure("This program is not yet equipped to handle OTUs :/ Get to it, Mike!")
     ##################
 
     check_for_file_and_contents(args.isa_zip)
@@ -84,7 +78,7 @@ def main():
 
     read_counts_df = get_read_counts_from_raw_multiqc(samples_in_ISA_order, map_tab)
 
-    gen_and_write_out_QC_metadata_tab(samples_in_ISA_order, read_counts_df)
+#    gen_and_write_out_QC_metadata_tab(samples_in_ISA_order, read_counts_df)
 
     gen_and_write_out_filenames_table(samples_in_ISA_order, map_tab, read_counts_df)
 
@@ -235,7 +229,13 @@ def get_prefix_from_map(sample_name, mapping_tab):
 
 def get_read_count_from_df(sample_name, read_counts_tab):
 
-    return(read_counts_tab.at[str(sample_name) + "_R1_raw", "counts"])
+    if args.single_ended:
+
+        return(read_counts_tab.at[str(sample_name) + "_raw", "counts"])
+
+    else:
+
+        return(read_counts_tab.at[str(sample_name) + "_R1_raw", "counts"])
 
 def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab):
 
@@ -254,9 +254,11 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
     fastqc = [file_prefix + "raw_multiqc_data.zip", file_prefix + "raw_multiqc_report.html.zip", file_prefix + "filtered_multiqc_data.zip", file_prefix + "filtered_multiqc_report.html.zip"]
     
     if args.type == "ASVs":
-        final_outputs = [file_prefix + "ASVs.fasta",  file_prefix + "counts.tsv", file_prefix + "read-count-tracking.tsv", file_prefix + "taxonomy-and-counts.biom.zip", file_prefix + "taxonomy-and-counts.tsv", file_prefix + "taxonomy.tsv"]
+        rep_seq_output = file_prefix + "ASVs.fasta"
     else:
-        final_outputs = [file_prefix + "OTUs.fasta",  file_prefix + "counts.tsv", file_prefix + "read-count-tracking.tsv", file_prefix + "taxonomy-and-counts.biom.zip", file_prefix + "taxonomy-and-counts.tsv", file_prefix + "taxonomy.tsv"]
+        rep_seq_output = file_prefix + "OTUs.fasta"
+
+    final_outputs = [rep_seq_output,  file_prefix + "counts.tsv", file_prefix + "read-count-tracking.tsv", file_prefix + "taxonomy-and-counts.biom.zip", file_prefix + "taxonomy-and-counts.tsv", file_prefix + "taxonomy.tsv"]
 
     processing_info = file_prefix + "processing_info.tar"
 
@@ -268,13 +270,19 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
 
     for sample in sample_names:
 
-        curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
+        if args.single_ended:
+
+            curr_raw_data = [file_prefix + sample + raw_suffix]
+            curr_trimmed_data = [file_prefix + sample + primer_trimmed_suffix, file_prefix + "trimmed-read-counts.tsv", file_prefix + "cutadapt.log"]
+            curr_filt_data = [file_prefix + sample + filtered_suffix, file_prefix + "filtered-read-counts.tsv", file_prefix + "bbduk.log"]
+
+        else:
+
+            curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
+            curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, file_prefix + sample + primer_trimmed_R2_suffix, file_prefix + "trimmed-read-counts.tsv", file_prefix + "cutadapt.log"]
+            curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix, file_prefix + "filtered-read-counts.tsv"]
 
         curr_read_count = get_read_count_from_df(sample, read_count_tab)
-
-        curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, file_prefix + sample + primer_trimmed_R2_suffix, file_prefix + "trimmed-read-counts.tsv", file_prefix + "cutadapt.log"]
-
-        curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix, file_prefix + "filtered-read-counts.tsv"]
 
         curr_row_as_list = [sample, readme, "", "",
                             ", ".join(curr_raw_data), "", "",

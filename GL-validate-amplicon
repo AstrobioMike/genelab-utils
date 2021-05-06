@@ -109,7 +109,7 @@ def report_failure(message, color = "yellow"):
     wprint(color_text(message, color))
     print("\nValidation failed.\n")
 
-    with open("validation.log", "a") as log:
+    with open(validation_log, "a") as log:
         log.write(message + "\n" + "Validation failed." + "\n\n")
 
     sys.exit(1)
