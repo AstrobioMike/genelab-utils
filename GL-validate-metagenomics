@@ -81,7 +81,7 @@ processing_tar_file = "processing_info.tar"
 expected_tar_contents = ["/Snakefile", "/config.yaml", "/envs", "/logs", "/scripts", "/unique-sample-IDs.txt"]
 
 expected_log_file_suffixes = ["-CAT.log", "-assembly.log", "-bam-summarize-and-metabat.log", "-bowtie2-build.log", 
-                              "-kofamscan.log", "-pileup.log", "-prodigal.log", "-humann3-run.log"]
+                              "-bbduk.log", "-kofamscan.log", "-pileup.log", "-prodigal.log", "-humann3-run.log"]
 
 
 validation_log = str(args.GLDS_ID) + "-metagenomics-validation.log"
@@ -540,11 +540,6 @@ def check_processing_tar(samples):
 
             if target_log not in entries:
                 report_failure("The '" + str(processing_tar_file) + "' does not have the '" + str(target_log) + "' log file as expected.")
-
-        target_log = str(logs_dir) + "bbduk-" + str(sample) + ".log"
-
-        if target_log not in entries:
-            report_failure("The '" + str(processing_tar_file) + "' does not have the '" + str(target_log) + "' log file as expected.")
 
 
 if __name__ == "__main__":

@@ -208,7 +208,9 @@ def check_multiqc_outputs(sample_names):
     """ makes sure all samples' read files are in the multiqc outputs """
 
     # checking raw
-    zip_file = zipfile.ZipFile(fastqc_dir + str(args.output_prefix) + "raw_multiqc_data.zip")
+    raw_multiqc_data_path = fastqc_dir + str(args.output_prefix) + "raw_multiqc_data.zip"
+    check_for_file_and_contents(raw_multiqc_data_path)
+    zip_file = zipfile.ZipFile(raw_multiqc_data_path)
     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
@@ -232,7 +234,9 @@ def check_multiqc_outputs(sample_names):
                 report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
     # checking filtered
-    zip_file = zipfile.ZipFile(fastqc_dir + str(args.output_prefix) + "filtered_multiqc_data.zip")
+    filt_multiqc_data_path = fastqc_dir + str(args.output_prefix) + "filtered_multiqc_data.zip"
+    check_for_file_and_contents(filt_multiqc_data_path)
+    zip_file = zipfile.ZipFile(filt_multiqc_data_path)
     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
