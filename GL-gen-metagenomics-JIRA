@@ -65,9 +65,9 @@ def main():
 
     read_counts_df = get_read_counts_from_raw_multiqc(samples_in_ISA_order)
 
-    gen_and_write_out_QC_metadata_tab(samples_in_ISA_order, read_counts_df)
+#    gen_and_write_out_QC_metadata_tab(samples_in_ISA_order, read_counts_df)
 
-    gen_and_write_out_filenames_table(samples_in_ISA_order)
+    gen_and_write_out_filenames_table(samples_in_ISA_order, read_counts_df)
 
 ################################################################################
 
@@ -167,10 +167,16 @@ def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
     out_df.to_csv(args.GLDS_ID + "-QC-metadata.tsv", sep = "\t", float_format='%.0f', index = False)
 
 
-def gen_and_write_out_filenames_table(sample_names):
+def get_read_count_from_df(sample_name, read_counts_tab):
+
+    return(read_counts_tab.at[str(sample_name) + "_R1_raw", "counts"])
+
+
+def gen_and_write_out_filenames_table(sample_names, read_count_tab):
 
     header_colnames = ["Sample Name", "Parameter Value[README]", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + raw_reads_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
+                       "Parameter Value[Read Depth]", "Unit", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + filtered_reads_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + fastqc_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
                        "Parameter Value[" + assembly_based_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
@@ -216,11 +222,18 @@ def gen_and_write_out_filenames_table(sample_names):
 
     processing_info = file_prefix + "processing_info.tar"
 
+    read_count_unit = "read"
+    read_count_term_source_ref = "SO"
+    read_count_term_acc_number = "http://purl.obolibrary.org/obo/SO_0000150"
+
+
     building_df = pd.DataFrame(columns = header_colnames)
 
     for sample in sample_names:
 
         curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
+
+        curr_read_count = get_read_count_from_df(sample, read_count_tab)
 
         curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix]
 
@@ -271,6 +284,7 @@ def gen_and_write_out_filenames_table(sample_names):
 
         curr_row_as_list = [sample, readme, "", "",
                             ", ".join(curr_raw_data), "", "",
+                            curr_read_count, read_count_unit, read_count_term_source_ref, read_count_term_acc_number,
                             ", ".join(curr_filt_data),"", "",
                             ", ".join(fastqc), "", "",
                             assembly_overview_tab, "", "",
