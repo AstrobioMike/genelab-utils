@@ -34,7 +34,7 @@ args = parser.parse_args()
 ### hard-coded stuff we might want to change ###
 file_prefix = args.GLDS_ID + "_GMetagenomics_"
 
-raw_reads_dir = "Raw_Data/"
+raw_reads_dir = "Raw_Sequence_Data/"
 fastqc_dir = "FastQC_Outputs/"
 filtered_reads_dir = "Filtered_Sequence_Data/"
 assembly_based_dir = "Assembly-based_Processing/"
