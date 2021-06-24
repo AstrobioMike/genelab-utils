@@ -10,7 +10,7 @@ curl -sLO https://github.com/asaravia-butler/GeneLab_Data_Processing/archive/ref
 
 unzip -qq mikes-branch.zip "GeneLab_Data_Processing-mikes-branch/Amplicon/Illumina/workflow-template/*"
 
-mv GeneLab_Data_Processing-mikes-branch/Amplicon/Illumina/workflow-template/ processing_info
+mv GeneLab_Data_Processing-mikes-branch/Amplicon/Illumina/workflow-template/ .
 
 rm -rf GeneLab_Data_Processing-mikes-branch/ mikes-branch.zip
 
