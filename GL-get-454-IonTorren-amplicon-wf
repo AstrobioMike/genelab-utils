@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 
 if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-  printf "\n  Currently pulls 454/IonTorrent amplicon workflow from:\n  github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Amplicon/454-and-IonTorrent\n\n"
-  printf "  For version info run \`GL-version\`.\n\n"
-  exit
+    printf "\n  Currently pulls 454/IonTorrent amplicon workflow from:\n"
+    printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Amplicon/454-and-IonTorrent\n\n"
+    printf "  For version info run \`GL-version\`.\n\n"
+    exit
 fi
 
 curl -sLO https://github.com/asaravia-butler/GeneLab_Data_Processing/archive/refs/heads/mikes-branch.zip
 
 unzip -qq mikes-branch.zip "GeneLab_Data_Processing-mikes-branch/Amplicon/454-and-IonTorrent/workflow-template/*"
 
-mv GeneLab_Data_Processing-mikes-branch/Amplicon/454-and-IonTorrent/workflow-template/ processing_info
+mv GeneLab_Data_Processing-mikes-branch/Amplicon/454-and-IonTorrent/workflow-template/ 454-and-IonTorrent-workflow
 
 rm -rf GeneLab_Data_Processing-mikes-branch/ mikes-branch.zip
 
 printf "\n  Pulled 454/IonTorrent amplicon workflow from:\n"
-printf "    github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Amplicon/454-and-IonTorrent\n\n"
+printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Amplicon/454-and-IonTorrent\n\n"

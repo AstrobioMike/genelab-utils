@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 
 if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-  printf "\n  Currently pulls Illumina metagenomics workflow from:\n  github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Illumina\n\n"
-  printf "  For version info run \`GL-version\`.\n\n"
-  exit
+    printf "\n  Currently pulls Illumina metagenomics workflow from:\n"
+    printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Illumina\n\n"
+    printf "  For version info run \`GL-version\`.\n\n"
+    exit
 fi
 
 curl -sLO https://github.com/asaravia-butler/GeneLab_Data_Processing/archive/refs/heads/mikes-branch.zip
 
 unzip -qq mikes-branch.zip "GeneLab_Data_Processing-mikes-branch/Metagenomics/Illumina/workflow-template/*"
 
-mv GeneLab_Data_Processing-mikes-branch/Metagenomics/Illumina/workflow-template/ .
+mv GeneLab_Data_Processing-mikes-branch/Metagenomics/Illumina/workflow-template/ Illumina-metagenomics-workflow
 
 rm -rf GeneLab_Data_Processing-mikes-branch/ mikes-branch.zip
 
 printf "\n  Pulled Illumina metagenomic workflow from:\n"
-printf "    github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Illumina\n\n"
+printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Illumina\n\n"
