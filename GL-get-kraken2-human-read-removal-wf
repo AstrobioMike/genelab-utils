@@ -20,4 +20,4 @@ printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-bran
 
 printf "  Unless changed in the 'config.yaml' file, that workflow will download and utilize the kraken2\n"
 printf "      human reference database built as described here:\n"
-printf "      https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/mikes-branch/Metagenomics/Remove_human_reads_from_raw_data/workflow-usage.md#reference-database-info\n\n"
+printf "      https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/mikes-branch/Metagenomics/Remove_human_reads_from_raw_data/reference-database-info.md\n\n"
