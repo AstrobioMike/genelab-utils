@@ -1,0 +1,30 @@
+# this file would go here: ~/.config/snakemake/slurm/config.yaml
+cluster:
+    mkdir -p slurm-logs &&
+    if [ -z {wildcards} ]; then log_wildcard=""; else log_wildcard=$(echo "-{wildcards}" | sed 's/ID=//'); fi  &&
+    sbatch --mem={resources.mem_mb} -c {resources.cpus} -J {rule} -o slurm-logs/{rule}${{log_wildcard}}-%j.log -e slurm-logs/{rule}${{log_wildcard}}-%j.log
+use-conda:
+    True
+# conda-prefix:
+#     ${CONDA_PREFIX}/envs
+  # the above won't work because shell variables aren't expanded in here, but it should be replaced with the path output by running `echo ${CONDA_PREFIX}/envs`
+cores:
+    80
+jobs:
+    10
+printshellcmds:
+    True
+reason:
+    True
+rerun-incomplete:
+    True
+scheduler:
+    greedy
+latency-wait:
+    60
+resources:
+    - cpus=80
+    - mem_mb=120000
+default-resources:
+    - cpus=1
+    - mem_mb=2000
