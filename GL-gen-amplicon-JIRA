@@ -251,7 +251,7 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
 
     # entries and values that don't change per sample
     readme = file_prefix + "README.txt"
-    fastqc = [file_prefix + "raw_multiqc_data.zip", file_prefix + "raw_multiqc_report.html.zip", file_prefix + "filtered_multiqc_data.zip", file_prefix + "filtered_multiqc_report.html.zip"]
+    fastqc = [file_prefix + "raw_multiqc_data.zip", file_prefix + "raw_multiqc_report.html", file_prefix + "filtered_multiqc_data.zip", file_prefix + "filtered_multiqc_report.html"]
     
     if args.type == "ASVs":
         rep_seq_output = file_prefix + "ASVs.fasta"
