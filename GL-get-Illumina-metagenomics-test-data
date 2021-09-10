@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 
 if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-    printf "\n  Downloads paired-end Illumina raw data for two test samples (~600 MB total) from:\n"
+    printf "\n  Downloads paired-end Illumina raw data for two test samples (~800 MB total) from:\n"
     printf "      https://figshare.com/account/projects/116958/articles/14872095\n\n"
     printf "  For version info run \`GL-version\`.\n\n"
     exit
 fi
 
 printf "\n    Downloading Sample-1 read files:\n\n"
-curl -L -o Sample-1_R1_raw.fastq.gz https://ndownloader.figshare.com/files/28630638
-curl -L -o Sample-1_R2_raw.fastq.gz https://ndownloader.figshare.com/files/28630641
+curl -L -o Sample-1_R1_raw.fastq.gz https://figshare.com/ndownloader/files/30723875
+curl -L -o Sample-1_R2_raw.fastq.gz https://figshare.com/ndownloader/files/30723878
 
 printf "\n\n    Downloading Sample-2 read files:\n\n"
-curl -L -o Sample-2_R1_raw.fastq.gz https://ndownloader.figshare.com/files/28630650
-curl -L -o Sample-2_R2_raw.fastq.gz https://ndownloader.figshare.com/files/28630653
+curl -L -o Sample-2_R1_raw.fastq.gz https://figshare.com/ndownloader/files/30723884
+curl -L -o Sample-2_R2_raw.fastq.gz https://figshare.com/ndownloader/files/30723887
 
 printf "\n\n  Pulled raw Illumina reads for two test samples from here:\n"
 printf "      https://figshare.com/account/projects/116958/articles/14872095\n\n"
 
 printf "  If using these with the Illumina metagenomics workflow, don't forget to put them\n"
 printf "      in the appropriate directory as set in the config.yaml file, and to add their \n"
-printf "      names to the input sample ID file being used :)\n\n"
+printf "      names to the input sample ID file being used :)\n\n\n"
