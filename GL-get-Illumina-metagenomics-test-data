@@ -2,7 +2,7 @@
 
 if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
     printf "\n  Downloads paired-end Illumina raw data for two test samples (~800 MB total) from:\n"
-    printf "      https://figshare.com/account/projects/116958/articles/14872095\n\n"
+    printf "      https://figshare.com/articles/dataset/Illumina_metagenomics_workflow_test_files/14872095\n\n"
     printf "  For version info run \`GL-version\`.\n\n"
     exit
 fi
