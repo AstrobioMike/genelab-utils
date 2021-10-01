@@ -16,7 +16,7 @@ curl -L -o Sample-2_R1_raw.fastq.gz https://figshare.com/ndownloader/files/30723
 curl -L -o Sample-2_R2_raw.fastq.gz https://figshare.com/ndownloader/files/30723887
 
 printf "\n\n  Pulled raw Illumina reads for two test samples from here:\n"
-printf "      https://figshare.com/account/projects/116958/articles/14872095\n\n"
+printf "      https://figshare.com/articles/dataset/Illumina_metagenomics_workflow_test_files/14872095\n\n"
 
 printf "  If using these with the Illumina metagenomics workflow, don't forget to put them\n"
 printf "      in the appropriate directory as set in the config.yaml file, and to add their \n"
