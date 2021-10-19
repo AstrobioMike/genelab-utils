@@ -23,6 +23,8 @@ required = parser.add_argument_group('required arguments')
 
 required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
 required.add_argument("-i", "--isa-zip", help='Appropriate ISA file for dataset (zipped)', action="store", required = True)
+parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
+
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -30,6 +32,7 @@ if len(sys.argv)==1:
 
 args = parser.parse_args()
 
+additional_prefix = str(args.additional_prefix)
 
 ### hard-coded stuff we might want to change ###
 file_prefix = args.GLDS_ID + "_GMetagenomics_"
@@ -53,7 +56,7 @@ filtered_R1_suffix = "_R1_filtered.fastq.gz"
 filtered_R2_suffix = "_R2_filtered.fastq.gz"
 assembly_suffix = "-assembly.fasta"
 
-processing_tar_file = "processing_info.tar"
+processing_tar_file = additional_prefix + "processing_info.tar"
 
 ################################################################################
 
@@ -132,7 +135,7 @@ def get_samples_from_ISA(isa_file):
 
 def get_read_counts_from_raw_multiqc(sample_names):
 
-    zip_file = zipfile.ZipFile(fastqc_dir + "raw_multiqc_data.zip")
+    zip_file = zipfile.ZipFile(fastqc_dir + additional_prefix + "raw_multiqc_data.zip")
     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
     df.columns = ["sample", "counts"]
     df.set_index("sample", inplace = True)
@@ -191,36 +194,59 @@ def gen_and_write_out_filenames_table(sample_names, read_count_tab):
                        "Parameter Value[Processing Info]", "Term Source REF", "Term Accession Number"]
 
     # entries that don't change per sample
-    readme = file_prefix + "README.txt"
-    fastqc = [file_prefix + "raw_multiqc_data.zip", file_prefix + "raw_multiqc_report.html", file_prefix + "filtered_multiqc_data.zip", file_prefix + "filtered_multiqc_report.html"]
-    assembly_overview_tab = file_prefix + "Assembly-based-processing-overview.tsv"
+    readme = file_prefix + additional_prefix + "README.txt"
+    fastqc = [file_prefix + additional_prefix + "raw_multiqc_data.zip", 
+              file_prefix + additional_prefix + "raw_multiqc_report.html", 
+              file_prefix + additional_prefix + "filtered_multiqc_data.zip", 
+              file_prefix + additional_prefix + "filtered_multiqc_report.html"]
 
-    if os.path.exists(assemblies_dir + "Failed-assemblies.tsv"):
-        assembly_files = [file_prefix + "assembly-summaries.tsv", file_prefix + "Failed-assemblies.tsv"]
+    assembly_overview_tab = file_prefix + additional_prefix + "Assembly-based-processing-overview.tsv"
+
+    if os.path.exists(assemblies_dir + additional_prefix + "Failed-assemblies.tsv"):
+        assembly_files = [file_prefix + additional_prefix + "assembly-summaries.tsv", file_prefix + additional_prefix + "Failed-assemblies.tsv"]
     else:
-        assembly_files = [file_prefix + "assembly-summaries.tsv"]
+        assembly_files = [file_prefix + additional_prefix + "assembly-summaries.tsv"]
 
-    if os.path.exists(bins_dir + "bins-overview.tsv"):
-        bins_overview = [file_prefix + "bins-overview.tsv"]
+    if os.path.exists(bins_dir + additional_prefix + "bins-overview.tsv"):
+        bins_overview = [file_prefix + additional_prefix + "bins-overview.tsv"]
         bins_dir_files = [file for file in os.listdir(bins_dir) if file.endswith(".fasta")]
     else:
         bins_overview = [""]
 
-    if os.path.exists(MAGs_dir + "MAGs-overview.tsv"):
-        MAGs_overview = [file_prefix + "MAGs-overview.tsv"]
+    if os.path.exists(MAGs_dir + additional_prefix + "MAGs-overview.tsv"):
+        MAGs_overview = [file_prefix + additional_prefix + "MAGs-overview.tsv"]
         MAGs_dir_files = [file for file in os.listdir(MAGs_dir) if file.endswith(".fasta")]
     else:
         MAGs_overview = [""]
 
-    combined_outputs = [file_prefix + "Combined-gene-level-KO-function-coverages.tsv", file_prefix + "Combined-gene-level-KO-function-coverages-CPM.tsv",
-                            file_prefix + "Combined-gene-level-taxonomy-coverages.tsv", file_prefix + "Combined-gene-level-taxonomy-coverages-CPM.tsv",
-                            file_prefix + "Combined-contig-level-taxonomy-coverages.tsv", file_prefix + "Combined-contig-level-taxonomy-coverages-CPM.tsv"]
+    MAG_KO_files_list = []
+    if os.path.exists(MAGs_dir + additional_prefix + "MAG-level-KO-annotations.tsv"):
+        MAG_KO_files_list.append(file_prefix + additional_prefix + "MAG-level-KO-annotations.tsv")
+    if os.path.exists(MAGs_dir + additional_prefix + "MAG-KEGG-Decoder-out.tsv"):
+        MAG_KO_files_list.append(file_prefix + additional_prefix + "MAG-KEGG-Decoder-out.tsv")
+    if os.path.exists(MAGs_dir + additional_prefix + "MAG-KEGG-Decoder-out.html"):
+        MAG_KO_files_list.append(file_prefix + additional_prefix + "MAG-KEGG-Decoder-out.html")
 
-    read_based_outputs = [file_prefix + "Gene-families.tsv", file_prefix + "Gene-families-grouped-by-taxa.tsv", file_prefix + "Gene-families-cpm.tsv", file_prefix + "Gene-families-KO-cpm.tsv",
-                      file_prefix + "Pathway-abundances.tsv", file_prefix + "Pathway-abundances-grouped-by-taxa.tsv", file_prefix + "Pathway-abundances-cpm.tsv", file_prefix + "Pathway-coverages.tsv",
-                      file_prefix + "Pathway-coverages-grouped-by-taxa.tsv", file_prefix + "Metaphlan-taxonomy.tsv"]
 
-    processing_info = file_prefix + "processing_info.tar"
+    combined_outputs = [file_prefix + additional_prefix + "Combined-gene-level-KO-function-coverages.tsv", 
+                        file_prefix + additional_prefix + "Combined-gene-level-KO-function-coverages-CPM.tsv",
+                        file_prefix + additional_prefix + "Combined-gene-level-taxonomy-coverages.tsv", 
+                        file_prefix + additional_prefix + "Combined-gene-level-taxonomy-coverages-CPM.tsv",
+                        file_prefix + additional_prefix + "Combined-contig-level-taxonomy-coverages.tsv", 
+                        file_prefix + additional_prefix + "Combined-contig-level-taxonomy-coverages-CPM.tsv"]
+
+    read_based_outputs = [file_prefix + additional_prefix + "Gene-families.tsv", 
+                          file_prefix + additional_prefix + "Gene-families-grouped-by-taxa.tsv", 
+                          file_prefix + additional_prefix + "Gene-families-cpm.tsv", 
+                          file_prefix + additional_prefix + "Gene-families-KO-cpm.tsv",
+                          file_prefix + additional_prefix + "Pathway-abundances.tsv", 
+                          file_prefix + additional_prefix + "Pathway-abundances-grouped-by-taxa.tsv", 
+                          file_prefix + additional_prefix + "Pathway-abundances-cpm.tsv", 
+                          file_prefix + additional_prefix + "Pathway-coverages.tsv",
+                          file_prefix + additional_prefix + "Pathway-coverages-grouped-by-taxa.tsv", 
+                          file_prefix + additional_prefix + "Metaphlan-taxonomy.tsv"]
+
+    processing_info = file_prefix + additional_prefix + "processing_info.tar"
 
     read_count_unit = "read"
     read_count_term_source_ref = "SO"
@@ -272,13 +298,13 @@ def gen_and_write_out_filenames_table(sample_names, read_count_tab):
         if len(curr_read_mapping) == 0:
             curr_read_mapping = [""]
 
-        if bins_overview[0] == file_prefix + "bins-overview.tsv":
+        if bins_overview[0] == file_prefix + additional_prefix + "bins-overview.tsv":
             curr_bins = bins_overview + [file_prefix + file for file in bins_dir_files if file.startswith(sample)]
         else:
             curr_bins = [""]
 
-        if MAGs_overview[0] == file_prefix + "MAGs-overview.tsv":
-            curr_MAGs = MAGs_overview + [file_prefix + file for file in MAGs_dir_files if file.startswith(sample)]
+        if MAGs_overview[0] == file_prefix + additional_prefix + "MAGs-overview.tsv":
+            curr_MAGs = MAGs_overview + [file_prefix + file for file in MAGs_dir_files if file.startswith(sample)] + MAG_KO_files_list
         else:
             curr_MAGs = [""]
 
@@ -301,7 +327,10 @@ def gen_and_write_out_filenames_table(sample_names, read_count_tab):
         # adding to building dataframe
         building_df.loc[len(building_df)] = curr_row_as_list
 
-    building_df.to_csv(args.GLDS_ID + "-associated-file-names.tsv", sep = "\t", index = False)
+    if additional_prefix != "":
+        building_df.to_csv(str(args.GLDS_ID) + "_" + additional_prefix + "associated-file-names.tsv", sep = "\t", index = False)
+    else:
+        building_df.to_csv(str(args.GLDS_ID) + "-associated-file-names.tsv", sep = "\t", index = False)
 
 if __name__ == "__main__":
     main()

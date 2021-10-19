@@ -22,6 +22,7 @@ required = parser.add_argument_group('required arguments')
 required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
 required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store", required = True)
 parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
+parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
 
 
 if len(sys.argv)==1:
@@ -30,6 +31,7 @@ if len(sys.argv)==1:
 
 args = parser.parse_args()
 
+additional_prefix = str(args.additional_prefix)
 
 ### hard-coded stuff we might want to change ###
 raw_reads_dir = "Raw_Sequence_Data/"
@@ -44,7 +46,7 @@ combined_output_dir = assembly_based_dir + "combined-outputs/"
 bins_dir = assembly_based_dir + "bins/"
 MAGs_dir = assembly_based_dir + "MAGs/"
 read_based_dir = "Read-based_Processing/"
-logs_dir = "processing_info/logs/"
+logs_dir = additional_prefix + "processing_info/logs/"
 
 expected_dirs = [raw_reads_dir, fastqc_dir, filtered_reads_dir, assembly_based_dir,
                  assemblies_dir, genes_dir, annotations_and_tax_dir, mapping_dir,
@@ -63,20 +65,29 @@ filtered_R2_suffix = "_R2_filtered.fastq.gz"
 assembly_suffix = "-assembly.fasta"
 
 
-expected_assembly_combined_outputs = ["Combined-contig-level-taxonomy-coverages-CPM.tsv", "Combined-gene-level-KO-function-coverages-CPM.tsv",
-                                      "Combined-gene-level-taxonomy-coverages-CPM.tsv", "Combined-contig-level-taxonomy-coverages.tsv",
-                                      "Combined-gene-level-KO-function-coverages.tsv", "Combined-gene-level-taxonomy-coverages.tsv"]
+expected_assembly_combined_outputs = [str(additional_prefix) + "Combined-contig-level-taxonomy-coverages-CPM.tsv",
+                                      str(additional_prefix) + "Combined-gene-level-KO-function-coverages-CPM.tsv",
+                                      str(additional_prefix) + "Combined-gene-level-taxonomy-coverages-CPM.tsv",
+                                      str(additional_prefix) + "Combined-contig-level-taxonomy-coverages.tsv",
+                                      str(additional_prefix) + "Combined-gene-level-KO-function-coverages.tsv",
+                                      str(additional_prefix) + "Combined-gene-level-taxonomy-coverages.tsv"]
 
-assembly_based_overview_table = assembly_based_dir + "Assembly-based-processing-overview.tsv"
+assembly_based_overview_table = assembly_based_dir + str(additional_prefix) + "Assembly-based-processing-overview.tsv"
 
-expected_read_based_outputs = ["Gene-families-KO-cpm.tsv", "Gene-families-cpm.tsv", "Gene-families-grouped-by-taxa.tsv",
-                               "Gene-families.tsv", "Metaphlan-taxonomy.tsv", "Pathway-abundances-cpm.tsv",
-                               "Pathway-abundances-grouped-by-taxa.tsv", "Pathway-abundances.tsv",
-                               "Pathway-coverages-grouped-by-taxa.tsv", "Pathway-coverages.tsv"]
+expected_read_based_outputs = [str(additional_prefix) + "Gene-families-KO-cpm.tsv", 
+                               str(additional_prefix) + "Gene-families-cpm.tsv", 
+                               str(additional_prefix) + "Gene-families-grouped-by-taxa.tsv",
+                               str(additional_prefix) + "Gene-families.tsv", 
+                               str(additional_prefix) + "Metaphlan-taxonomy.tsv", 
+                               str(additional_prefix) + "Pathway-abundances-cpm.tsv",
+                               str(additional_prefix) + "Pathway-abundances-grouped-by-taxa.tsv", 
+                               str(additional_prefix) + "Pathway-abundances.tsv",
+                               str(additional_prefix) + "Pathway-coverages-grouped-by-taxa.tsv", 
+                               str(additional_prefix) + "Pathway-coverages.tsv"]
 
 expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
 
-processing_tar_file = "processing_info.tar"
+processing_tar_file = str(additional_prefix) + "processing_info.tar"
 
 expected_tar_contents = ["/Snakefile", "/config.yaml", "/envs", "/logs", "/scripts", "/unique-sample-IDs.txt"]
 
@@ -84,7 +95,10 @@ expected_log_file_suffixes = ["-CAT.log", "-assembly.log", "-bam-summarize-and-m
                               "-bbduk.log", "-kofamscan.log", "-pileup.log", "-prodigal.log", "-humann3-run.log"]
 
 
-validation_log = str(args.GLDS_ID) + "-metagenomics-validation.log"
+if additional_prefix == "":
+    validation_log = str(args.GLDS_ID) + "-metagenomics-validation.log"
+else:
+    validation_log = str(args.GLDS_ID) + "_" + str(additional_prefix) + "metagenomics-validation.log"
 
 ################################################################################
 
@@ -144,7 +158,7 @@ def report_failure(message, color = "yellow"):
     wprint(color_text(message, color))
     print("\nValidation failed.\n")
 
-    with open("validation.log", "a") as log:
+    with open(validation_log, "a") as log:
         log.write(message + "\n" + "Validation failed." + "\n\n")
 
     sys.exit(1)
@@ -227,7 +241,7 @@ def check_multiqc_outputs(sample_names):
     """ makes sure all samples' read files are in the multiqc outputs """
 
     # checking raw
-    zip_file = zipfile.ZipFile(fastqc_dir + "raw_multiqc_data.zip")
+    zip_file = zipfile.ZipFile(fastqc_dir + str(additional_prefix) + "raw_multiqc_data.zip")
     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
@@ -251,7 +265,7 @@ def check_multiqc_outputs(sample_names):
                 report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
     # checking filtered
-    zip_file = zipfile.ZipFile(fastqc_dir + "filtered_multiqc_data.zip")
+    zip_file = zipfile.ZipFile(fastqc_dir + str(additional_prefix) + "filtered_multiqc_data.zip")
     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
@@ -318,8 +332,8 @@ def get_failed_assemblies():
 
     failed_assemblies_list = []
 
-    if os.path.exists(assemblies_dir + "Failed-assemblies.tsv"):
-        with open(assemblies_dir + "Failed-assemblies.tsv") as failed_assemblies:
+    if os.path.exists(assemblies_dir + additional_prefix + "Failed-assemblies.tsv"):
+        with open(assemblies_dir + additional_prefix + "Failed-assemblies.tsv") as failed_assemblies:
             for line in failed_assemblies:
                 failed_assemblies_list.append(line.strip().split("\t")[0])
 
@@ -339,7 +353,6 @@ def check_assembly_based_file(sample, file_path, failed_assemblies_list, assembl
         report_failure("The expected file '" + str(file_path) + "' does not exist.")
 
     if not os.path.getsize(file_path) > 0:
-
 
         # a sample can have no genes called even if the assembly produced contigs, so this is only throwing a warning if we are checking an assembly here
         if sample not in failed_assemblies_list and assembly == True:
@@ -364,7 +377,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
             check_general_fasta_format(curr_fasta_path)
 
     # making sure assembly summary file is there
-    assembly_summary_path = assemblies_dir + "assembly-summaries.tsv"
+    assembly_summary_path = assemblies_dir + additional_prefix + "assembly-summaries.tsv"
 
     if not os.path.exists(assembly_summary_path):
         report_failure("The assembly summary file, " + str(assembly_summary_path) + ", is expected but was not found.")
@@ -441,7 +454,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
 
     if output_files_present:
 
-        output_fasta_bins = [filename for filename in output_files_present if filename.endswith(".fa")]
+        output_fasta_bins = [filename for filename in output_files_present if filename.endswith(".fasta")]
 
         # checking for contents (checking fasta format not straightforward when there are softwraps, but don't want to remove them on these due to large contigs)
         for bin_file in output_fasta_bins:
@@ -455,7 +468,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
         # making sure summary table is there if there are any bins
         if len(output_fasta_bins) > 0:
 
-            bins_summary_path = bins_dir + "bins-overview.tsv"
+            bins_summary_path = bins_dir + additional_prefix + "bins-overview.tsv"
 
             if not os.path.exists(bins_summary_path):
 
@@ -468,7 +481,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
 
     if output_files_present:
 
-        output_fasta_MAGs = [filename for filename in output_files_present if filename.endswith(".fa")]
+        output_fasta_MAGs = [filename for filename in output_files_present if filename.endswith(".fasta")]
 
         # checking for contents (checking fasta format not straightforward when there are softwraps, but don't want to remove them on these due to large contigs)
         for MAG_file in output_fasta_MAGs:
@@ -482,7 +495,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
         # making sure summary table is there if there are any bins
         if len(output_fasta_bins) > 0:
 
-            MAGs_summary_path = MAGs_dir + "MAGs-overview.tsv"
+            MAGs_summary_path = MAGs_dir + additional_prefix + "MAGs-overview.tsv"
 
             if not os.path.exists(MAGs_summary_path):
 
