@@ -37,7 +37,7 @@ additional_prefix = str(args.additional_prefix)
 output_file = additional_prefix + str(args.output)
 
 ### hard-coded stuff we might want to change ###
-raw_reads_dir = "Raw_Data/"
+raw_reads_dir = "Raw_Sequence_Data/"
 fastqc_dir = "FastQC_Outputs/"
 filtered_reads_dir = "Filtered_Sequence_Data/"
 

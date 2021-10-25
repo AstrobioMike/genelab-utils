@@ -56,8 +56,8 @@ assembly_based_dirs = [assemblies_dir, genes_dir, annotations_and_tax_dir, mappi
                        combined_output_dir, bins_dir, MAGs_dir]
 
 raw_suffix = "_raw.fastq.gz"
-raw_R1_suffix = "_R1_raw.fastq.gz"
-raw_R2_suffix = "_R2_raw.fastq.gz"
+raw_R1_suffix = "_R1_HRemoved_raw.fastq.gz"
+raw_R2_suffix = "_R2_HRemoved_raw.fastq.gz"
 filtered_suffix = "_filtered.fastq.gz"
 filtered_R1_suffix = "_R1_filtered.fastq.gz"
 filtered_R2_suffix = "_R2_filtered.fastq.gz"
