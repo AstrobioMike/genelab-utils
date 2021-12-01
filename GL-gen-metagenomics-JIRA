@@ -50,6 +50,7 @@ bins_dir = "Assembly-based_Processing/bins/"
 MAGs_dir = "Assembly-based_Processing/MAGs/"
 read_based_dir = "Read-based_Processing/"
 
+raw_R1_suffix_no_ext = "_R1_HRremoved_raw"
 raw_R1_suffix = "_R1_HRremoved_raw.fastq.gz"
 raw_R2_suffix = "_R2_HRremoved_raw.fastq.gz"
 filtered_R1_suffix = "_R1_filtered.fastq.gz"
@@ -172,7 +173,7 @@ def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
 
 def get_read_count_from_df(sample_name, read_counts_tab):
 
-    return(read_counts_tab.at[str(sample_name) + "_R1_raw", "counts"])
+    return(read_counts_tab.at[str(sample_name) + str(raw_R1_suffix_no_ext), "counts"])
 
 
 def gen_and_write_out_filenames_table(sample_names, read_count_tab):
