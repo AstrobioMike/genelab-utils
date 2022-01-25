@@ -1,0 +1,241 @@
+#!/usr/bin/env python
+
+"""
+This is a helper program for a specific demultiplexing step in the 
+GeneLab Raw Data Generation for Bulk RNAseq Prepared with theh Qiagen UPX Kit
+protocol: https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/amanda-branch/Raw_Data_Generation/UPX_kit_for_bulk_RNAseq.md
+"""
+
+import sys
+import os
+import argparse
+import textwrap
+from Bio import SeqIO
+from Bio.SeqIO.QualityIO import FastqGeneralIterator
+import gzip
+import pandas as pd
+import subprocess
+from subprocess import Popen, PIPE
+
+parser = argparse.ArgumentParser(description = "This is a helper program for a specific demultiplexing step for the \
+                                              GeneLab Raw Data Generation for Bulk RNAseq Prepared with theh Qiagen UPX Kit protocol \
+                                              https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/amanda-branch/Raw_Data_Generation/UPX_kit_for_bulk_RNAseq.md",
+                                 epilog = "Ex. usage: GL-bulk-RNAseq-qiagen-UPX-demultiplex -c cell-ids.txt -p pooled-fastq.gz -O output-directory/\n")
+
+parser.add_argument("-c", "--cell-IDs", help = "Single-column file holding unique cell IDs", action = "store")
+parser.add_argument("-p", "--pooled-fastq-file", help = 'Pooled fastq file, expected to be gzipped', action = "store")
+parser.add_argument("-O", "--output-directory", help = "Output directory to hold split read files.", action = "store")
+parser.add_argument("--prefix", help = "A prefix added to the output file names if wanted (e.g., \"Pool_A\")", action = "store", default = "")
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+zipped_suffix = "_R1_raw.fastq.gz"
+suffix = "_R1_raw.fastq"
+
+################################################################################
+
+def main():
+
+    # handling if prefix provided or not
+    if args.prefix == "":
+        prefix = ""
+    else:
+        prefix = str(args.prefix) + "_"
+
+    # handling if output dir was specific with or without a trailing "/"
+    if str(args.output_directory).endswith("/"):
+        output_directory = args.output_directory
+    else:
+        output_directory = str(args.output_directory) + "/"
+
+    check_all_inputs_exist([args.cell_IDs, args.pooled_fastq_file])
+
+    check_output_dir(output_directory)
+
+    # getting list of unique cell IDs
+    cell_IDs_list = [line.strip() for line in open(args.cell_IDs, "r")]
+
+    # checking outputs don't exist already, if they do, exiting with note
+    check_if_outputs_already_exist(cell_IDs_list, output_directory, prefix, zipped_suffix)
+
+    # making dictionary with keys as unique cell IDs and values to be populated with counts of reads found/written for that ID
+    cell_IDs_read_counts_dict = {key: 0 for key in cell_IDs_list}
+    # adding unmatched
+    cell_IDs_read_counts_dict["unmatched"] = 0
+
+    counts_dict = split_input_fastq_file(cell_IDs_list, cell_IDs_read_counts_dict, args.pooled_fastq_file, output_directory, prefix, suffix)
+
+    write_out_counts_dict(counts_dict, output_directory, prefix)
+
+    compress_output_files(cell_IDs_list, output_directory, prefix, suffix, zipped_suffix)
+
+################################################################################
+
+
+# setting some colors
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+### functions ###
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    """ print wrapper """
+
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def check_all_inputs_exist(input_list):
+
+    for file in input_list:
+        if not os.path.exists(file):
+            print("")
+            wprint(color_text("It seems the specified input file '" + str(file) + "' can't be found.", "yellow"))
+            print("\nExiting for now.\n")
+            sys.exit(1)
+
+
+def check_output_dir(output_dir):
+
+    # creating output direcotry if it doesn't exist already
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+
+def check_if_outputs_already_exist(IDs_list, output_dir, prefix, suffix):
+
+    # making sure outputs don't already exist, exiting if they do
+    for cell_ID in IDs_list:
+
+        file_path = str(output_dir) + str(prefix) + str(cell_ID) + str(suffix)
+        if os.path.exists(file_path):
+
+            print("")
+            wprint(color_text("It seems the expected output file '" + str(file_path) + "' already exists.", "yellow"))
+            print("")
+            wprint("We don't want to overwrite things, remove them first if wanting to write new files there.")
+            print("\nExiting for now.\n")
+            sys.exit(1)
+
+
+def split_input_fastq_file(IDs_list, counts_dict, input_fastq, output_dir, prefix, suffix):
+
+    # opening all potential output files (to avoid overhead of opening and closing on each entry)
+    # dictionary to link cell IDs to their specific file handle
+    files_dict = {}
+
+    i = 0
+    for cell_ID in IDs_list:
+
+        i += 1
+
+        curr_handle = "handle_" + str(i)
+
+        files_dict[cell_ID] = curr_handle
+
+        curr_file_path = str(output_dir) + str(prefix) + str(cell_ID) + str(suffix)
+
+        files_dict[cell_ID] = open(curr_file_path, "w")
+
+
+    unmatched_out = open(str(output_dir) + str(prefix) + "unmatched" + str(suffix), "w")
+
+    # opening and running through our pooled input fastq
+    with gzip.open(input_fastq, "rt") as fastq_in:
+
+        # iterating fastq entries with biopython
+        for header, seq, qual in FastqGeneralIterator(fastq_in):
+
+            # looping through our cell IDs list so long as this entry hasn't been matched yet
+            for cell_ID in IDs_list:
+
+                # checking if ID is in header
+                if "_" + str(cell_ID) + "_" in header:
+
+                    files_dict[cell_ID].write("@%s\n%s\n+\n%s\n" % (header, seq, qual))
+
+                    # adding a count for that cell ID to the counts dictionary
+                    counts_dict[cell_ID] += 1
+
+                    # stopping search for this entry
+                    break
+
+            else:
+
+                # if not found, writing to unmatched output and counting
+                unmatched_out.write("@%s\n%s\n+\n%s\n" % (header, seq, qual))
+
+                counts_dict["unmatched"] += 1
+
+    # closing all files
+    for cell_ID in IDs_list:
+
+        files_dict[cell_ID].close()
+
+    unmatched_out.close()
+
+    return(counts_dict)
+
+
+def write_out_counts_dict(counts_dict, output_dir, prefix):
+
+    if prefix == "":
+        out_counts_handle = str(output_dir) + "Demux-cellID-read-counts.tsv"
+    else:
+        out_counts_handle = str(output_dir) + str(prefix) + "-Demux-cellID-read-counts.tsv"
+
+    counts_tab = pd.DataFrame.from_dict(counts_dict, orient = 'index')
+
+    # moving index to column
+    counts_tab.reset_index(inplace = True)
+
+    # naming columns
+    counts_tab.rename(columns = {'index': "cell_ID", 0: "num_reads"}, inplace = True)
+    # writing out
+
+    counts_tab.to_csv(out_counts_handle, sep = "\t", index = False)
+
+
+def compress_output_files(IDs_list, output_dir, prefix, suffix, zipped_suffix):
+
+    all_files_to_compress_list = []
+
+    for cell_ID in IDs_list:
+
+        curr_file_path = str(output_dir) + str(prefix) + str(cell_ID) + str(suffix)
+
+        if os.path.exists(curr_file_path):
+
+            all_files_to_compress_list.append(curr_file_path)
+
+    # doing in parallel
+    cmds_list = [['gzip', '-f', file_path] for file_path in all_files_to_compress_list]
+    procs_list = [Popen(cmd, stdout = PIPE, stderr = PIPE) for cmd in cmds_list]
+
+    for proc in procs_list:
+        proc.wait()
+
+    # compressing unmatched file
+    unmatched_curr_file_path = str(output_dir) + str(prefix) + "unmatched" + str(suffix)
+
+    if os.path.exists(unmatched_curr_file_path):
+
+        subprocess.run(["gzip", "-f", unmatched_curr_file_path])
+
+
+if __name__ == "__main__":
+    main()
