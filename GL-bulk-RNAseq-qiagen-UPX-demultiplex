@@ -196,7 +196,7 @@ def write_out_counts_dict(counts_dict, output_dir, prefix):
     if prefix == "":
         out_counts_handle = str(output_dir) + "Demux-cellID-read-counts.tsv"
     else:
-        out_counts_handle = str(output_dir) + str(prefix) + "-Demux-cellID-read-counts.tsv"
+        out_counts_handle = str(output_dir) + str(prefix) + "Demux-cellID-read-counts.tsv"
 
     counts_tab = pd.DataFrame.from_dict(counts_dict, orient = 'index')
 
