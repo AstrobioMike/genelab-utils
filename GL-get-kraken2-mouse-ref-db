@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+    printf "\n  Currently pulls the kraken2 mouse reference database built as described here:\n"
+    printf "      https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/mikes-branch/Metagenomics/Estimate_host_reads_in_raw_data/reference-database-info.md\n"
+    printf "\n  It is ~2.6GB compressed, and ~3.8GB uncompressed.\n"
+    printf "\n  For version info run \`GL-version\`.\n\n"
+    exit
+fi
+
+printf "\n    Downloading reference database (~2.6GB compressed):\n\n"
+curl -L -o kraken2-mouse-db.tar.gz https://ndownloader.figshare.com/files/33900572
+printf "\n"
+
+printf "\n    Unpacking and decompressing (~3.8GB uncompressed)...\n"
+tar -xzf kraken2-mouse-db.tar.gz
+
+printf "\n  Pulled kraken2 mouse reference database built as described here:\n"
+printf "      https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/mikes-branch/Metagenomics/Estimate_host_reads_in_raw_data/reference-database-info.md\n\n"

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+    printf "\n  Currently pulls kraken2 host-read estimation workflow from:\n"
+    printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Estimate_host_reads_in_raw_data\n"
+    printf "\n  For version info run \`GL-version\`.\n\n"
+    exit
+fi
+
+curl -sLO https://github.com/asaravia-butler/GeneLab_Data_Processing/archive/refs/heads/mikes-branch.zip
+
+unzip -qq mikes-branch.zip "GeneLab_Data_Processing-mikes-branch/Metagenomics/Estimate_host_reads_in_raw_data/workflow-template/*"
+
+mv GeneLab_Data_Processing-mikes-branch/Metagenomics/Estimate_host_reads_in_raw_data/workflow-template/ estimate-host-reads-workflow
+
+rm -rf GeneLab_Data_Processing-mikes-branch/ mikes-branch.zip
+
+printf "\n  Pulled kraken2 host-read estimation workflow from:\n"
+printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Estimate_host_reads_in_raw_data\n\n"
+
+printf "  If wanted, the GeneLab mouse reference kraken2 database can be downloaded with the command 'GL-get-kraken2-mouse-ref-db'.\n"
+printf "      It was built as described here:\n"
+printf "      https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/mikes-branch/Metagenomics/Estimate_host_reads_in_raw_data/reference-database-info.md\n\n"
