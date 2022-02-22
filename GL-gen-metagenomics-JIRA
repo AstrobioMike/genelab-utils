@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This is a program for generating the 2 JIRA tables needed for GeneLab metagenomics processed datasets for Curation.
+This is a program for generating the JIRA table needed for GeneLab metagenomics processed datasets for Curation.
 """
 
 import os
@@ -13,7 +13,7 @@ import tarfile
 import zipfile
 import glob
 
-parser = argparse.ArgumentParser(description="This program generates the 2 JIRA tables needed for GeneLab metagenomics \
+parser = argparse.ArgumentParser(description="This program generates the JIRA table needed for GeneLab metagenomics \
                                              processed datasets to be passed onto Curation.\
                                              Hard-coded variables that may need to be changed are at the top \
                                              of the script. It is expected to be run after `GL-validate-metagenomics` and \
