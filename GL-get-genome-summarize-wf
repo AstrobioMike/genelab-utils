@@ -13,7 +13,7 @@ unzip -qq main.zip
 
 rm genome-assembly-summary-main/README.md main.zip
 
-mv genome-assembly-summary-main/ genome-assembly-summarization-workflow
+mv genome-assembly-summary-main/ genome-assembly-stats-and-tax-workflow
 
 printf "\n  Pulled genome summarize workflow from:\n"
 printf "      github.com/AstrobioMike/genome-assembly-summary\n\n"
