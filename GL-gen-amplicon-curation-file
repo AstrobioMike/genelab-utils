@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This is a program for generating the 2 JIRA tables needed for GeneLab amplicon processed datasets for Curation.
+This is a program for generating the table needed for GeneLab amplicon processed datasets for Curation.
 """
 
 import os
@@ -12,8 +12,8 @@ import pandas as pd
 import tarfile
 import zipfile
 
-parser = argparse.ArgumentParser(description="This program generates the 2 JIRA tables needed for GeneLab amplicon \
-                                             processed datasets to be passed onto Curation.\
+parser = argparse.ArgumentParser(description="This program generates table needed by curation for GeneLab amplicon \
+                                             processed datasets.\
                                              Hard-coded variables that may need to be changed are at the top \
                                              of the script. It is expected to be run after `GL-validate-amplicon` and \
                                              `GL-gen-amplicon-readme` have been run successfully.")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This is a program for generating the JIRA table needed for a GeneLab metagenomics raw dataset for Curation.
+This is a program for generating the table needed by curation for a GeneLab metagenomics raw dataset.
 """
 
 import os
@@ -13,8 +13,8 @@ import tarfile
 import zipfile
 import glob
 
-parser = argparse.ArgumentParser(description="This program generates the JIRA table needed for GeneLab metagenomics \
-                                             raw datasets to be passed onto Curation.\
+parser = argparse.ArgumentParser(description="This program generates the table needed by Curation for GeneLab metagenomics \
+                                             raw datasets.\
                                              Hard-coded variables that may need to be changed are at the top \
                                              of the script. It is expected to be run after the remove-human-reads workflow and \
                                              takes off from the \"Human-read-removal-summary.tsv\" file produced by it. \
