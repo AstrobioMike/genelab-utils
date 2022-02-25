@@ -108,18 +108,14 @@ def read_in_summary_tab(file_path):
 
 def gen_and_write_out_filenames_table(in_tab):
 
-    header_colnames = ["Sample Name", "Parameter Value[Read Depth]", "Unit", "Term Source REF", "Term Accession Number",
-                       "Parameter Value[Human Reads Removed]", "Unit", "Term Source REF", "Term Accession Number",
-                       "Parameter Value[Read Depth]", "Unit", "Term Source REF", "Term Accession Number",
+    header_colnames = ["Sample Name", "Parameter Value[Read Depth]", "Unit",
+                       "Parameter Value[Human Reads Removed]", "Unit",
+                       "Parameter Value[Read Depth]", "Unit",
                        "Assay Name", "Raw Data File", "Parameter Value[Multiqc File Names]"]
 
     # entries that don't change per sample
     read_depth_unit = "read"
-    read_depth_term_source = "SO"
-    read_depth_term_acc = "http://purl.obolibrary.org/obo/SO_0000150"
     reads_removed_unit = "percent"
-    reads_removed_term_source = "UO"
-    reads_removed_term_acc = "http://purl.obolibrary.org/obo/UO_0000187"
     assay_name = "metagenomics"
     multiqc_file_names = str(file_prefix) + str(additional_prefix) + str(multiqc_data) + ", " + str(file_prefix) + str(additional_prefix) + str(multiqc_html)
 
@@ -130,15 +126,11 @@ def gen_and_write_out_filenames_table(in_tab):
     
     building_df["Parameter Value[Read Depth]"] = in_tab["Total_fragments_after"].tolist()
     building_df["Unit"] = read_depth_unit
-    building_df["Term Source REF"] = read_depth_term_source
-    building_df["Term Accession Number"]  = read_depth_term_acc
 
     building_df["Parameter Value[Human Reads Removed]"] = in_tab["Percent_human_reads_removed"].tolist()
     building_df["new Unit"] = reads_removed_unit
-    building_df["new Term Source REF"] = reads_removed_term_source
-    building_df["new Term Accession Number"] = reads_removed_term_acc
     
-    building_df = building_df.rename(columns = {"new Unit": "Unit", "new Term Source REF": "Term Source REF","new Term Accession Number": "Term Accession Number"})
+    building_df = building_df.rename(columns = {"new Unit": "Unit"})
 
     building_df["Assay Name"] = assay_name
     
@@ -159,6 +151,62 @@ def gen_and_write_out_filenames_table(in_tab):
         building_df.to_csv(str(args.GLDS_ID) + "_" + additional_prefix + "Human-read-removed-file-associations.tsv", sep = "\t", index = False)
     else:
         building_df.to_csv(str(args.GLDS_ID) + "-Human-read-removed-file-associations.tsv", sep = "\t", index = False)
+
+
+### commented out version below was when Curation wanted me to include "Term Source REF" and "Term Accession Number" columns
+# def gen_and_write_out_filenames_table(in_tab):
+
+#     header_colnames = ["Sample Name", "Parameter Value[Read Depth]", "Unit", "Term Source REF", "Term Accession Number",
+#                        "Parameter Value[Human Reads Removed]", "Unit", "Term Source REF", "Term Accession Number",
+#                        "Parameter Value[Read Depth]", "Unit", "Term Source REF", "Term Accession Number",
+#                        "Assay Name", "Raw Data File", "Parameter Value[Multiqc File Names]"]
+
+#     # entries that don't change per sample
+#     read_depth_unit = "read"
+#     read_depth_term_source = "SO"
+#     read_depth_term_acc = "http://purl.obolibrary.org/obo/SO_0000150"
+#     reads_removed_unit = "percent"
+#     reads_removed_term_source = "UO"
+#     reads_removed_term_acc = "http://purl.obolibrary.org/obo/UO_0000187"
+#     assay_name = "metagenomics"
+#     multiqc_file_names = str(file_prefix) + str(additional_prefix) + str(multiqc_data) + ", " + str(file_prefix) + str(additional_prefix) + str(multiqc_html)
+
+#     # making output table
+#     building_df = pd.DataFrame()
+
+#     building_df["Sample Name"] = in_tab["Sample_ID"].tolist()
+    
+#     building_df["Parameter Value[Read Depth]"] = in_tab["Total_fragments_after"].tolist()
+#     building_df["Unit"] = read_depth_unit
+#     building_df["Term Source REF"] = read_depth_term_source
+#     building_df["Term Accession Number"]  = read_depth_term_acc
+
+#     building_df["Parameter Value[Human Reads Removed]"] = in_tab["Percent_human_reads_removed"].tolist()
+#     building_df["new Unit"] = reads_removed_unit
+#     building_df["new Term Source REF"] = reads_removed_term_source
+#     building_df["new Term Accession Number"] = reads_removed_term_acc
+    
+#     building_df = building_df.rename(columns = {"new Unit": "Unit", "new Term Source REF": "Term Source REF","new Term Accession Number": "Term Accession Number"})
+
+#     building_df["Assay Name"] = assay_name
+    
+#     # building raw file column
+#     raw_data_file_col = []
+#     for sample in in_tab["Sample_ID"].tolist():
+
+#         to_add = str(file_prefix) + str(sample) + str(raw_R1_suffix) + ", " + str(file_prefix) + str(sample) + str(raw_R2_suffix)
+        
+#         raw_data_file_col.append(to_add)
+
+#     building_df["Raw Data File"] = raw_data_file_col
+
+#     if args.include_qc_files:
+#         building_df["Parameter Value[Multiqc File Names]"] = multiqc_file_names
+
+#     if additional_prefix != "":
+#         building_df.to_csv(str(args.GLDS_ID) + "_" + additional_prefix + "Human-read-removed-file-associations.tsv", sep = "\t", index = False)
+#     else:
+#         building_df.to_csv(str(args.GLDS_ID) + "-Human-read-removed-file-associations.tsv", sep = "\t", index = False)
 
 if __name__ == "__main__":
     main()

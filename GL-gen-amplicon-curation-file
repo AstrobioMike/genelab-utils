@@ -237,9 +237,75 @@ def get_read_count_from_df(sample_name, read_counts_tab):
 
         return(read_counts_tab.at[str(sample_name) + "_R1_raw", "counts"])
 
+
 def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab):
 
-    ## right now only for if primers were trimmed in workflow and is paired-end ##
+    ## right now only for if primers were trimmed in workflow ##
+    header_colnames = ["Sample Name", "Parameter Value[README]",
+                      "Parameter Value[" + raw_reads_dir.replace("_", " ").rstrip("/") + "]",
+                      "Parameter Value[Read Depth]", "Unit",
+                      "Parameter Value[" + trimmed_reads_dir.replace("_", " ").rstrip("/") + "]",
+                      "Parameter Value[" + filtered_reads_dir.replace("_", " ").rstrip("/") + "]",
+                      "Parameter Value[" + fastqc_dir.replace("_", " ").rstrip("/") + "]",
+                      "Parameter Value[" + final_outputs_dir.replace("_", " ").rstrip("/") + "]",
+                      "Parameter Value[Processing Info]"]
+
+
+    # entries and values that don't change per sample
+    readme = file_prefix + "README.txt"
+    fastqc = [file_prefix + "raw_multiqc_data.zip", file_prefix + "raw_multiqc_report.html", file_prefix + "filtered_multiqc_data.zip", file_prefix + "filtered_multiqc_report.html"]
+    
+    if args.type == "ASVs":
+        rep_seq_output = file_prefix + "ASVs.fasta"
+    else:
+        rep_seq_output = file_prefix + "OTUs.fasta"
+
+    final_outputs = [rep_seq_output,  file_prefix + "counts.tsv", file_prefix + "read-count-tracking.tsv", file_prefix + "taxonomy-and-counts.biom.zip", file_prefix + "taxonomy-and-counts.tsv", file_prefix + "taxonomy.tsv"]
+
+    processing_info = file_prefix + "processing_info.tar"
+
+    read_count_unit = "read"
+    read_count_term_source_ref = "SO"
+    read_count_term_acc_number = "http://purl.obolibrary.org/obo/SO_0000150"
+
+    building_df = pd.DataFrame(columns = header_colnames)
+
+    for sample in sample_names:
+
+        if args.single_ended:
+
+            curr_raw_data = [file_prefix + sample + raw_suffix]
+            curr_trimmed_data = [file_prefix + sample + primer_trimmed_suffix, file_prefix + "trimmed-read-counts.tsv", file_prefix + "cutadapt.log"]
+            curr_filt_data = [file_prefix + sample + filtered_suffix, file_prefix + "filtered-read-counts.tsv", file_prefix + "bbduk.log"]
+
+        else:
+
+            curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
+            curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, file_prefix + sample + primer_trimmed_R2_suffix, file_prefix + "trimmed-read-counts.tsv", file_prefix + "cutadapt.log"]
+            curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix, file_prefix + "filtered-read-counts.tsv"]
+
+        curr_read_count = get_read_count_from_df(sample, read_count_tab)
+
+        curr_row_as_list = [sample, readme,
+                            ", ".join(curr_raw_data),
+                            curr_read_count, read_count_unit,
+                            ", ".join(curr_trimmed_data),
+                            ", ".join(curr_filt_data),
+                            ", ".join(fastqc), "", "",
+                            ", ".join(final_outputs),
+                            processing_info]
+
+        # adding to building dataframe
+        building_df.loc[len(building_df)] = curr_row_as_list
+
+    building_df.to_csv(args.GLDS_ID + "-associated-file-names.tsv", sep = "\t", float_format='%.0f', index = False)
+
+
+
+### commented out version below was when Curation wanted me to include "Term Source REF" and "Term Accession Number" columns
+def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab):
+
+    ## right now only for if primers were trimmed in workflow ##
     header_colnames = ["Sample Name", "Parameter Value[README]", "Term Source REF", "Term Accession Number",
                       "Parameter Value[" + raw_reads_dir.replace("_", " ").rstrip("/") + "]", "Term Source REF", "Term Accession Number",
                       "Parameter Value[Read Depth]", "Unit", "Term Source REF", "Term Accession Number",
@@ -298,6 +364,7 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
 
     building_df.to_csv(args.GLDS_ID + "-associated-file-names.tsv", sep = "\t", float_format='%.0f', index = False)
 
+    ## below here is a template from prior script for when i integrate dealing with those where primers weren't removed by genelab
     # with open(args.GLDS_ID + "-associated-file-names.tsv", "w") as output:
 
     #     # header
