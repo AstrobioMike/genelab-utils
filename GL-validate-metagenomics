@@ -55,7 +55,7 @@ expected_dirs = [raw_reads_dir, fastqc_dir, filtered_reads_dir, assembly_based_d
 assembly_based_dirs = [assemblies_dir, genes_dir, annotations_and_tax_dir, mapping_dir,
                        combined_output_dir, bins_dir, MAGs_dir]
 
-raw_suffix = "_raw.fastq.gz"
+raw_suffix = "_HRremoved_raw.fastq.gz"
 raw_R1_suffix = "_R1_HRremoved_raw.fastq.gz"
 raw_R2_suffix = "_R2_HRremoved_raw.fastq.gz"
 filtered_suffix = "_filtered.fastq.gz"
