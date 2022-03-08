@@ -178,9 +178,15 @@ def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
     out_df.to_csv(args.GLDS_ID + "-QC-metadata.tsv", sep = "\t", float_format='%.0f', index = False)
 
 
-def get_read_count_from_df(sample_name, read_counts_tab):
+def get_read_count_from_df(sample_name, read_counts_tab, single_ended):
 
-    return(read_counts_tab.at[str(sample_name) + str(raw_R1_suffix_no_ext), "counts"])
+    if single_ended:
+
+        return(read_counts_tab.at[str(sample_name) + str(raw_suffix_no_ext), "counts"])
+
+    else:
+
+        return(read_counts_tab.at[str(sample_name) + str(raw_R1_suffix_no_ext), "counts"])
 
 
 def gen_and_write_out_filenames_table(sample_names, read_count_tab, single_ended):
@@ -271,7 +277,7 @@ def gen_and_write_out_filenames_table(sample_names, read_count_tab, single_ended
             curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
 
 
-        curr_read_count = get_read_count_from_df(sample, read_count_tab)
+        curr_read_count = get_read_count_from_df(sample, read_count_tab, single_ended)
 
         if single_ended:
 
