@@ -151,7 +151,7 @@ def get_read_counts_from_raw_multiqc(sample_names):
     return(df)
 
 
-def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df, single_ended):
+def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
 
     # generating needed order of names row writing out table (which has full file names) and as they are in the multiqc table, for finding them
     read_count_filename_list = []
@@ -183,7 +183,7 @@ def get_read_count_from_df(sample_name, read_counts_tab):
     return(read_counts_tab.at[str(sample_name) + str(raw_R1_suffix_no_ext), "counts"])
 
 
-def gen_and_write_out_filenames_table(sample_names, read_count_tab):
+def gen_and_write_out_filenames_table(sample_names, read_count_tab, single_ended):
 
     header_colnames = ["Sample Name", "Parameter Value[README]",
                        "Parameter Value[" + raw_reads_dir.replace("_", " ").rstrip("/") + "]",
