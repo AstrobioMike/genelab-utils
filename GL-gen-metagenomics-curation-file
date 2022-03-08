@@ -24,6 +24,7 @@ required = parser.add_argument_group('required arguments')
 required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
 required.add_argument("-i", "--isa-zip", help='Appropriate ISA file for dataset (zipped)', action="store", required = True)
 parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
+parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
 
 
 if len(sys.argv)==1:
@@ -57,6 +58,12 @@ filtered_R1_suffix = "_R1_filtered.fastq.gz"
 filtered_R2_suffix = "_R2_filtered.fastq.gz"
 assembly_suffix = "-assembly.fasta"
 
+# if single-end
+raw_suffix = "_HRremoved_raw.fastq.gz"
+raw_suffix_no_ext = "_HRremoved_raw"
+
+filtered_suffix = "_filtered.fastq.gz"
+
 processing_tar_file = additional_prefix + "processing_info.tar"
 
 ################################################################################
@@ -71,7 +78,7 @@ def main():
 
 #    gen_and_write_out_QC_metadata_tab(samples_in_ISA_order, read_counts_df)
 
-    gen_and_write_out_filenames_table(samples_in_ISA_order, read_counts_df)
+    gen_and_write_out_filenames_table(samples_in_ISA_order, read_counts_df, args.single_ended)
 
 ################################################################################
 
@@ -144,7 +151,7 @@ def get_read_counts_from_raw_multiqc(sample_names):
     return(df)
 
 
-def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
+def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df, single_ended):
 
     # generating needed order of names row writing out table (which has full file names) and as they are in the multiqc table, for finding them
     read_count_filename_list = []
@@ -255,11 +262,25 @@ def gen_and_write_out_filenames_table(sample_names, read_count_tab):
 
     for sample in sample_names:
 
-        curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
+        if single_ended:
+
+            curr_raw_data = [file_prefix + sample + raw_suffix]
+
+        else:
+
+            curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
+
 
         curr_read_count = get_read_count_from_df(sample, read_count_tab)
 
-        curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix]
+        if single_ended:
+
+            curr_filt_data = [file_prefix + sample + filtered_suffix]
+
+        else:
+
+            curr_filt_data = [file_prefix + sample + filtered_R1_suffix, file_prefix + sample + filtered_R2_suffix]
+
 
         # only adding file to list if it exists and isn't empty (easier for curation this way)
         curr_path = assemblies_dir + sample + assembly_suffix
