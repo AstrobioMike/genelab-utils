@@ -339,8 +339,13 @@ def check_for_processing_tar():
 
     target_substring = str(args.output_prefix).rstrip("-") + "/Snakefile"
 
+    base_target = "/Snakefile"
+
     if not any(target_substring.lower() in string.lower() for string in entries):
-        report_failure("The '" + processing_tar_file + "' does not have a 'Snakefile' as expected.")
+
+        if not any(base_target.lower() in string.lower() for string in entries):
+    
+            report_failure("The '" + processing_tar_file + "' does not have a 'Snakefile' as expected.")
 
 if __name__ == "__main__":
     main()
