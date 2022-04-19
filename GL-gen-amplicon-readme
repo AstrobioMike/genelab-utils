@@ -19,12 +19,13 @@ parser = argparse.ArgumentParser(description="This program generates the corresp
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store")
-parser.add_argument("--output", help='Name of output file (default: "README.txt")', default="README.txt")
+parser.add_argument("--output", help='Name of output file (default: "README.txt", with appended prefix if one is provided)', default="README.txt")
 parser.add_argument("--name", help='Name of individual who performed the processing (default: "Michael D. Lee")', default="Michael D. Lee")
 parser.add_argument("--email", help='Email address of individual who performed the processing (default: "Mike.Lee@nasa.gov")', default="Mike.Lee@nasa.gov")
 parser.add_argument("--protocol-ID", help='Protocol document ID followed (default: "GL-DPPD-7104-A")', default="GL-DPPD-7104-A")
 parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
                     therefore there are no trimmed sequence data.", action="store_true")
+parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -33,6 +34,10 @@ if len(sys.argv)==1:
 args = parser.parse_args()
 
 
+additional_prefix = str(args.additional_prefix)
+
+output_file = additional_prefix + str(args.output)
+
 ### hard-coded stuff we might want to change ###
 raw_reads_dir = "Raw_Sequence_Data/"
 fastqc_dir = "FastQC_Outputs/"
@@ -40,7 +45,8 @@ trimmed_reads_dir = "Trimmed_Sequence_Data/"
 filtered_reads_dir = "Filtered_Sequence_Data/"
 final_outputs_dir = "Final_Outputs/"
 
-processing_tar_file = "processing_info.tar"
+
+processing_tar_file = additional_prefix + "processing_info.tar"
 
 expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
 
@@ -52,7 +58,7 @@ def main():
 
     processing_tar_contents = get_processing_tar_contents()
 
-    with open(args.output, "w") as output:
+    with open(output_file, "w") as output:
 
         write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
 
@@ -79,7 +85,7 @@ def write_header(output, GLDS_ID, name, email, protocol_ID):
 def write_body(output, processing_tar_contents):
 
     # this file
-    output.write("    {:<41} {:>0}".format("- " + str(args.output), "- this file\n\n"))
+    output.write("    {:<41} {:>0}".format("- " + str(output_file), "- this file\n\n"))
 
     # fastqc info
     output.write("    {:<41} {:>0}".format("- " + str(fastqc_dir), "- multiQC summary reports of FastQC runs\n\n"))
