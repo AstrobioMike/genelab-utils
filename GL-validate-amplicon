@@ -53,6 +53,9 @@ filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
 processing_tar_file = "processing_info.tar"
 
+if args.output_prefix:
+    processing_tar_file = args.output_prefix.rstrip("-") + "_processing_info.tar"
+
 expected_trimmed_outputs_or_suffixes = [str(args.output_prefix) + "cutadapt.log", str(args.output_prefix) + "trimmed-read-counts.tsv"]
 expected_filtered_outputs_or_suffixes = ["filtered-read-counts.tsv"]
 expected_final_outputs_or_suffixes = [".fasta", str(args.output_prefix) + "counts.tsv", str(args.output_prefix) + "taxonomy.tsv", ".biom.zip", str(args.output_prefix) + "taxonomy-and-counts.tsv", str(args.output_prefix) + "read-count-tracking.tsv"]
