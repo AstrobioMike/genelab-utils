@@ -60,7 +60,7 @@ expected_trimmed_outputs_or_suffixes = [str(args.output_prefix) + "cutadapt.log"
 expected_filtered_outputs_or_suffixes = ["filtered-read-counts.tsv"]
 expected_final_outputs_or_suffixes = [".fasta", str(args.output_prefix) + "counts.tsv", str(args.output_prefix) + "taxonomy.tsv", ".biom.zip", str(args.output_prefix) + "taxonomy-and-counts.tsv", str(args.output_prefix) + "read-count-tracking.tsv"]
 
-validation_log = str(args.GLDS_ID) + "-" + str(args.output_prefix) + "amplicon-validation.log"
+validation_log = str(args.GLDS_ID) + "_" + str(args.output_prefix) + "amplicon-validation.log"
 
 ################################################################################
 
