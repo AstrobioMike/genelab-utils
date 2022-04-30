@@ -42,8 +42,11 @@ extensions = [".fq", ".fastq"]
 standard_GL_R1_suffix = "_R1_raw.fastq.gz"
 standard_GL_R2_suffix = "_R2_raw.fastq.gz"
 standard_GL_SE_suffix = "_raw.fastq.gz"
-fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
+
 md5_output_file = str(args.GLDS_ID) + "-raw-read-md5s.tsv"
+fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
+log_out = str(args.GLDS_ID) + "-raw-validation-log.txt"
+
 
 ################################################################################
 
@@ -61,29 +64,22 @@ def main():
 
         # creating mapping dictionary
         map_dict = check_files_and_gen_unique_ID_to_file_map(args.number_of_samples)
-#         print(map_dict)
 
         # starting validation output table
         out_tab = start_validation_output_table(map_dict)
-#         print(out_tab)
 
         # renaming files to be in our convention (e.g., _R1_raw.fastq.gz for forward, or "_raw.fastq.gz" 
         # if single-end), also adding to output table
         map_dict, out_tab = rename_files(map_dict, out_tab)
 
-        # print(map_dict)
-        # print(out_tab)
-        # generating md5s file
+        # generating md5s, writing to a collective md5 file, and adding to summary table
         map_dict, out_tab = gen_md5s(map_dict, out_tab)
 
-        print(map_dict)
-        print(out_tab)
+        # run fastqc and multiqc
+        run_fastqc_and_multiqc(map_dict)
 
-        # run fastqc/multiqc on all
-
-
-        # run multiqc
-
+        # add read counts to summary output table
+        # parse_and_add_read_counts(map_dict)
 
 
 
@@ -306,7 +302,6 @@ def rename_files(map_dict, out_tab):
 def gen_md5s(map_dict, out_tab):
     """ generates md5 checksum file for all read files """
 
-
     print_notification("Generating md5s...")
     # making dictionary holding md5 values
     md5_dict = {}
@@ -373,22 +368,56 @@ def gen_md5s(map_dict, out_tab):
 
                 md5_out_file.write(str(file_md5) + "\t" + str(file_name) + "\n")
 
-    return(md5_dict, out_tab)
-
-    # # making list of all files
-    # list_of_all_files = []
-
-    # for key in map_dict.keys():
-
-    #     list_of_all_files += map_dict[key]
+    return(map_dict, out_tab)
 
 
+def run_fastqc_and_multiqc(map_dict):
+    """ runs fastqc on all read files """
 
-    # # converting list to space-delimited string for passing to subprocess
-    # list_for_subprocess = " ".join(list_of_all_files)
-    
-    # subprocess.run(['ls', list_for_subprocess])
+    print_notification("Running fastqc...")
 
+    # making list of all files
+    list_of_all_files = []
+
+    for key in map_dict.keys():
+
+        list_of_all_files += map_dict[key]
+
+    # converting list to space-delimited string for passing to subprocess
+    list_for_subprocess = " ".join(list_of_all_files)
+    # building command since i can't figure out how to pass a list or space-delimited string of positional
+    # arguments to subprocess.run
+    with open(log_out, "w") as log:
+        log.write("\n\n    FASTQC log:\n\n")
+
+    fastqc_command = "fastqc -t " + str(fastqc_threads) + " " + str(list_for_subprocess) + " >> " + str(log_out) + " 2>&1"
+
+    subprocess.run([fastqc_command], shell = True)
+
+    # running multiqc
+    with open(log_out, "a") as log:
+        log.write("\n\n    MULTIQC log:\n\n")
+
+    multiqc_command = "multiqc ./ >> " + str(log_out) + " 2>&1"
+
+    subprocess.run([multiqc_command], shell = True)
+
+    # removing fastqc files unless specified not to
+    if not args.keep_fastqc_files:
+        
+        for file in glob.glob("*fastqc*"):
+            os.remove(file)
+
+
+def parse_and_add_read_counts(map_dict):
+
+    ## template below from 'GL-gen-metagenomics-curation-file' ##
+    # zip_file = zipfile.ZipFile(fastqc_dir + additional_prefix + "raw_multiqc_data.zip")
+    # df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+    # df.columns = ["sample", "counts"]
+    # df.set_index("sample", inplace = True)
+
+    return(df)
 
 if __name__ == "__main__":
     main()
