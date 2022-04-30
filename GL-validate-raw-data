@@ -47,6 +47,8 @@ md5_output_file = str(args.GLDS_ID) + "-raw-read-md5s.tsv"
 fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
 log_out = str(args.GLDS_ID) + "-raw-validation-log.txt"
 
+output_table_filename = str(args.GLDS_ID) + "-raw-validation-summary.tsv"
+
 
 ################################################################################
 
@@ -65,23 +67,26 @@ def main():
         # creating mapping dictionary
         map_dict = check_files_and_gen_unique_ID_to_file_map(args.number_of_samples)
 
-        # starting validation output table
+        # # starting validation output table
         out_tab = start_validation_output_table(map_dict)
 
-        # renaming files to be in our convention (e.g., _R1_raw.fastq.gz for forward, or "_raw.fastq.gz" 
-        # if single-end), also adding to output table
+        # # renaming files to be in our convention (e.g., _R1_raw.fastq.gz for forward, or "_raw.fastq.gz" 
+        # # if single-end), also adding to output table
         map_dict, out_tab = rename_files(map_dict, out_tab)
 
-        # generating md5s, writing to a collective md5 file, and adding to summary table
+        # # generating md5s, writing to a collective md5 file, and adding to summary table
         map_dict, out_tab = gen_md5s(map_dict, out_tab)
 
-        # run fastqc and multiqc
+        # # run fastqc and multiqc
         run_fastqc_and_multiqc(map_dict)
 
         # add read counts to summary output table
-        # parse_and_add_read_counts(map_dict)
+        out_tab = parse_and_add_read_counts(map_dict, out_tab)
 
-
+        # writing output summary table
+        out_tab.reset_index(inplace = True)
+        out_tab = out_tab.rename(columns = {'index': 'unique_ID'})
+        out_tab.to_csv(output_table_filename, sep = "\t", index = False)
 
 
 ################################################################################
@@ -409,15 +414,59 @@ def run_fastqc_and_multiqc(map_dict):
             os.remove(file)
 
 
-def parse_and_add_read_counts(map_dict):
+def parse_and_add_read_counts(map_dict, out_tab):
+    """ this gets the read counts from the multiqc output and adds them to the summary table """
 
-    ## template below from 'GL-gen-metagenomics-curation-file' ##
-    # zip_file = zipfile.ZipFile(fastqc_dir + additional_prefix + "raw_multiqc_data.zip")
-    # df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
-    # df.columns = ["sample", "counts"]
-    # df.set_index("sample", inplace = True)
+    df = pd.read_csv("multiqc_data/multiqc_general_stats.txt", sep = "\t", usecols = [0,5])
+    df.columns = ["sample", "counts"]
+    df.set_index("sample", inplace = True)
 
-    return(df)
+    # making dictionary of counts 
+    counts_dict = {}
+
+    if not args.single_ended:
+
+        for key in map_dict.keys():
+
+            forward_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][0])
+            reverse_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][1])
+
+            num_forward_reads = round(df.loc[forward_read_multiqc_ID, 'counts'])
+            num_reverse_reads = round(df.loc[reverse_read_multiqc_ID, 'counts'])
+
+            counts_dict[key] = [num_forward_reads]
+            counts_dict[key].append(num_reverse_reads)
+
+            # adding value for if counts are equal
+            if num_forward_reads == num_reverse_reads:
+
+                counts_dict[key].append("True")
+
+            else:
+
+                counts_dict[key].append("False")
+
+        # adding read counts to output table
+        new_tab = pd.DataFrame.from_dict(counts_dict, orient = "index", columns = ["R1_num_reads", "R2_num_reads", "R1_and_R2_num_reads_equal"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+    # handling if single-end
+    else:
+
+        for key in map_dict.keys():
+
+            read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][0])
+        
+            num_reads = round(df.loc[read_multiqc_ID, 'counts'])
+
+            counts_dict[key] = [num_reads]
+
+        # adding read counts to output table
+        new_tab = pd.DataFrame.from_dict(counts_dict, orient = "index", columns = ["read_counts"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+    return(out_tab)
+
 
 if __name__ == "__main__":
     main()
