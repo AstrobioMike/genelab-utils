@@ -13,19 +13,22 @@ import glob
 import re
 import subprocess
 
-parser = argparse.ArgumentParser(description = "This program validates GeneLab raw datasets, checks or creates md5s, and \
-                                                runs fastqc combines its outputs with multiqc. For version info, run `GL-version`.",
-                                 epilog = "Ex. usage: GL-validate-raw-data -g GLDS-480 -s samples.txt")
+parser = argparse.ArgumentParser(description = "This program validates GeneLab raw datasets, renames files if needed \
+                                                to follow GL convention, checks and/or creates md5s, and \
+                                                runs fastqc combines its outputs with multiqc. It is meant to be \
+                                                executed in the directory holding the read files. \
+                                                For version info, run `GL-version`.",
+                                 epilog = "Ex. usage: GL-validate-raw-data -g GLDS-480 -n 3")
 
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-480")', action = "store", required = True)
 required.add_argument("-n", "--number-of-samples", help = "The expected number of samples here", action = "store", type = int, required = True)
 
-parser.add_argument("--md5-file", help = "Include a file holding all md5sum results if avaiable (one will be created if not)", \
+parser.add_argument("-m", "--md5-file", help = "Include a file holding all md5sum results if avaiable (one will be created if not, or if the filenames are changed)", \
                     action = "store", default = "")
-parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
-parser.add_argument("--keep-fastqc-files", help = "Add this flag if wanting to keep individual-sample fastqc files", action = "store_true")
+parser.add_argument("-s", "--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
+parser.add_argument("-k", "--keep-fastqc-files", help = "Add this flag if wanting to keep individual-sample fastqc files", action = "store_true")
 
 
 if len(sys.argv)==1:
@@ -36,15 +39,18 @@ args = parser.parse_args()
 
 
 # currently hard-coded things we may want to adjust
-R1_designations = ["_R1_"]
-R2_designations = ["_R2_"]
+R1_designations = ["_R1_", "_R1."]
+R2_designations = ["_R2_", "_R2."]
 extensions = [".fq", ".fastq"]
 standard_GL_R1_suffix = "_R1_raw.fastq.gz"
 standard_GL_R2_suffix = "_R2_raw.fastq.gz"
 standard_GL_SE_suffix = "_raw.fastq.gz"
 
-md5_output_file = str(args.GLDS_ID) + "-raw-read-md5s.tsv"
+md5_output_file = str(args.GLDS_ID) + "-raw-read-md5s.txt"
+md5_check_output_file = str(args.GLDS_ID) + "-raw-read-md5-check-results.txt"
 fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
+multiqc_output_prefix = str(args.GLDS_ID) + "-raw-multiqc"
+
 log_out = str(args.GLDS_ID) + "-raw-validation-log.txt"
 
 output_table_filename = str(args.GLDS_ID) + "-raw-validation-summary.tsv"
@@ -54,39 +60,45 @@ output_table_filename = str(args.GLDS_ID) + "-raw-validation-summary.tsv"
 
 def main():
 
-    # making sure files for all expected samples can be found, 
-    # and making a map of unique name to file name
-    if args.md5_file:
-        # if an md5 file was provided, the map can be parsed from there,
-        # for now moving forward as if not provided
-        print("  \n\nNOT READY FOR MD5 INPUT YET!!\n\n")
-        exit(1)
+    # creating mapping dictionary of files to unique sample IDs
+    map_dict = check_files_and_gen_unique_ID_to_file_map(args.number_of_samples)
+
+    # starting validation output table
+    out_tab = start_validation_output_table(map_dict)
+
+    # if an md5 file was provided, checking md5s before changing their names
+    if args.md5_file != "":
+
+        md5_df = check_md5s(map_dict, out_tab)
+
+    # renaming files to be in our convention (e.g., _R1_raw.fastq.gz for forward, or "_raw.fastq.gz" 
+    # if single-end), also adding to output table
+    map_dict, out_tab = rename_files(map_dict, out_tab)
+
+    # checking gzip integrity
+    map_dict, out_tab, problem_files_list = check_gzip_integrity(map_dict, out_tab)
+
+    # generating md5s if none were provided
+    if args.md5_file == "":
+
+        map_dict, out_tab = gen_md5s(map_dict, out_tab, problem_files_list)
 
     else:
+        # adding them to the output summary table now if they were provided
+        out_tab = pd.concat([out_tab, md5_df], axis = 1)
+        # writing out new md5s file with renamed filenames
+        write_new_md5s_file(md5_df, out_tab)
 
-        # creating mapping dictionary
-        map_dict = check_files_and_gen_unique_ID_to_file_map(args.number_of_samples)
+    # run fastqc and multiqc
+    run_fastqc_and_multiqc(map_dict, problem_files_list)
 
-        # # starting validation output table
-        out_tab = start_validation_output_table(map_dict)
+    # add read counts to summary output table
+    out_tab = parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
-        # # renaming files to be in our convention (e.g., _R1_raw.fastq.gz for forward, or "_raw.fastq.gz" 
-        # # if single-end), also adding to output table
-        map_dict, out_tab = rename_files(map_dict, out_tab)
-
-        # # generating md5s, writing to a collective md5 file, and adding to summary table
-        map_dict, out_tab = gen_md5s(map_dict, out_tab)
-
-        # # run fastqc and multiqc
-        run_fastqc_and_multiqc(map_dict)
-
-        # add read counts to summary output table
-        out_tab = parse_and_add_read_counts(map_dict, out_tab)
-
-        # writing output summary table
-        out_tab.reset_index(inplace = True)
-        out_tab = out_tab.rename(columns = {'index': 'unique_ID'})
-        out_tab.to_csv(output_table_filename, sep = "\t", index = False)
+    # writing output summary table
+    out_tab.reset_index(inplace = True)
+    out_tab = out_tab.rename(columns = {'index': 'unique_ID'})
+    out_tab.to_csv(output_table_filename, sep = "\t", index = False)
 
 
 ################################################################################
@@ -259,10 +271,16 @@ def start_validation_output_table(map_dict):
 
 def rename_files(map_dict, out_tab):
     """ 
-    this renames the files to have the conventional GeneLab suffixes 
+    this renames the files to have the conventional GeneLab suffixes if needed
     e.g., _R1_raw.fastq.gz
     """
 
+    # value storing if we do rename anything or not
+    files_renamed = False
+
+    # dictionary of current samples-to-files map
+    current_map_dict = {}
+    # dictionary of renamed files (or not), for output table summary
     renamed_map_dict = {}
 
     if not args.single_ended:
@@ -272,14 +290,32 @@ def rename_files(map_dict, out_tab):
             R1_orig_name = map_dict[key][0]
             R2_orig_name = map_dict[key][1]
 
-            R1_new_name = str(key) + str(standard_GL_R1_suffix)
-            R2_new_name = str(key) + str(standard_GL_R2_suffix)
+            # only renaming if they don't fit our convention
+            if not R1_orig_name.endswith(standard_GL_R1_suffix):
 
-            os.rename(R1_orig_name, R1_new_name)
-            os.rename(R2_orig_name, R2_new_name)
+                files_renamed = True
 
-            renamed_map_dict[key] = [R1_new_name]
-            renamed_map_dict[key].append(R2_new_name)
+                R1_new_name = str(key) + str(standard_GL_R1_suffix)
+                os.rename(R1_orig_name, R1_new_name)
+                current_map_dict[key] = [R1_new_name]
+                renamed_map_dict[key] = [R1_new_name]
+
+            else:
+                current_map_dict[key] = [R1_orig_name]
+                renamed_map_dict[key] = ["not-renamed"]
+
+            if not R2_orig_name.endswith(standard_GL_R2_suffix):
+
+                files_renamed = True
+                
+                R2_new_name = str(key) + str(standard_GL_R2_suffix)
+                os.rename(R2_orig_name, R2_new_name)
+                current_map_dict[key].append(R2_new_name)
+                renamed_map_dict[key].append(R2_new_name)
+
+            else:
+                current_map_dict[key].append(R2_orig_name)
+                renamed_map_dict[key].append("not-renamed")
 
         # adding new names to output table
         new_tab = pd.DataFrame.from_dict(renamed_map_dict, orient = "index", columns = ["new_R1_filename", "new_R2_filename"])
@@ -291,20 +327,176 @@ def rename_files(map_dict, out_tab):
 
             orig_name = map_dict[key][0]
 
-            new_name = str(key) + str(standard_GL_SE_suffix)
+            # only renaming if doesn't fit our convention
+            if not orig_name.endswith(standard_GL_SE_suffix):
+    
+                new_name = str(key) + str(standard_GL_SE_suffix)
+                os.rename(orig_name, new_name)
+                current_map_dict[key] = [new_name]
+                renamed_map_dict[key] = [new_name]
 
-            os.rename(orig_name, new_name)
+            else:
+                current_map_dict[key] = [orig_name]
+                renamed_map_dict[key] = ["not-renamed"]
 
-            renamed_map_dict[key] = [new_name]
 
         # adding new names to output table
         new_tab = pd.DataFrame.from_dict(renamed_map_dict, orient = "index", columns = ["new_filename"])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
-    return(renamed_map_dict, out_tab)
+    return(current_map_dict, out_tab, files_renamed)
 
 
-def gen_md5s(map_dict, out_tab):
+def check_gzip_integrity(map_dict, out_tab):
+    """ runs gzip -t <file> on each to check and report integrity """
+
+    print_notification("Checking gzip integrity...")
+    # making dictionary holding gzip test results (PASS/FAIL)
+    gzip_test_dict = {}
+
+    # making list of problematic files
+    problem_files_list = []
+
+    if not args.single_ended:
+
+        for key in map_dict.keys():
+
+            forward_read_file = map_dict[key][0]
+            reverse_read_file = map_dict[key][1]
+
+            forward_gzip_test_out = subprocess.run(['gzip', '-t', forward_read_file], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+            reverse_gzip_test_out = subprocess.run(['gzip', '-t', reverse_read_file], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+
+            if forward_gzip_test_out.returncode != 0:
+                forward_gzip_test_result = "FAIL"
+                problem_files_list.append(forward_read_file)
+            else:
+                forward_gzip_test_result = "PASS"
+
+            if reverse_gzip_test_out.returncode != 0:
+                reverse_gzip_test_result = "FAIL"
+                problem_files_list.append(reverse_read_file)
+            else:
+                reverse_gzip_test_result = "PASS"
+
+            gzip_test_dict[key] = [forward_gzip_test_result]
+            gzip_test_dict[key].append(reverse_gzip_test_result)
+
+        ## adding results to output summary table
+        new_tab = pd.DataFrame.from_dict(gzip_test_dict, orient = "index", columns = ["R1_gzip_test", "R2_gzip_test"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+    # now handling single end
+    else:
+
+        for key in map_dict.keys():
+
+            read_file = map_dict[key][0]
+
+            gzip_test_out = subprocess.run(['gzip', '-t', read_file], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+
+            if gzip_test_out.returncode != 0:
+                gzip_test_result = "FAIL"
+                problem_files_list.append(read_file)
+            else:
+                gzip_test_result = "PASS"
+
+            gzip_test_dict[key] = [gzip_test_result]
+
+        # adding results to output summary table
+        new_tab = pd.DataFrame.from_dict(gzip_test_dict, orient = "index", columns = ["read_file_gzip_test"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+
+    return(map_dict, out_tab, problem_files_list)
+
+
+def check_md5s(map_dict, out_tab):
+    """ checks (if provided) or generates md5sums for all read files """
+
+    print_notification("Checking provided md5s...")
+
+    md5_in_df = pd.read_csv(args.md5_file, sep = "\s+", names = ["md5", "filename"])
+    md5_in_df.set_index('filename', inplace = True)
+
+    md5_check_command = "md5sum -c " + str(args.md5_file) + " > " + str(md5_check_output_file)
+
+    md5_check_out = subprocess.run([md5_check_command], shell = True, stderr = subprocess.PIPE)
+
+    # # checking if there was any problem
+    # if md5_check_out.returncode != 0:
+
+    #     print("PROBLEM")
+
+    # reading in md5sum check results
+    md5_check_results_df = pd.read_csv(md5_check_output_file, sep = ": ", names = ["filename", "status"], engine = "python")
+    md5_check_results_df.set_index('filename', inplace = True)
+
+    # getting md5 values into dictionary with our map_dict keys
+    md5_dict = {}
+
+    if not args.single_ended:
+
+        for key in map_dict.keys():
+
+            forward_read_file = map_dict[key][0]
+            reverse_read_file = map_dict[key][1]
+
+            forward_file_result = md5_check_results_df.loc[forward_read_file].status
+            reverse_file_result = md5_check_results_df.loc[reverse_read_file].status
+
+            forward_file_md5 = md5_in_df.loc[forward_read_file].md5
+            reverse_file_md5 = md5_in_df.loc[reverse_read_file].md5
+
+            if forward_file_result == "FAILED":
+                md5_dict[key] = ["FAIL"]
+            else:
+                md5_dict[key] = ["PASS"]
+
+            if reverse_file_result == "FAILED":
+                md5_dict[key].append("FAIL")
+            else:
+                md5_dict[key].append("PASS")
+
+            if forward_file_result == "FAILED":
+                md5_dict[key].append("failed-md5-check")
+            else:
+                md5_dict[key].append(forward_file_md5)
+
+            if reverse_file_result == "FAILED":
+                md5_dict[key].append("failed-md5-check")
+            else:
+                md5_dict[key].append(reverse_file_md5)
+
+
+        # putting into table to be combined with output summary table later
+        md5_df = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["R1_md5_check", "R2_md5_check", "R1_md5", "R2_md5"])
+
+    # if single-ended
+    else:
+
+        for key in map_dict.keys():
+
+            read_file = map_dict[key][0]
+            file_result = md5_check_results_df.loc[read_file].status
+            file_md5 = md5_in_df.loc[read_file].md5
+
+            if file_result == "FAILED":
+                md5_dict[key] = ["FAIL", "failed-md5-check"]
+
+            else:
+                md5_dict[key] = ["PASS", file_md5]
+
+        # putting into table to be combined with output summary table later
+        md5_df = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["md5_check", "md5"])
+
+    # removing md5_check_output_file
+    os.remove(md5_check_output_file)
+
+    return(md5_df)
+
+
+def gen_md5s(map_dict, out_tab, problem_files_list):
     """ generates md5 checksum file for all read files """
 
     print_notification("Generating md5s...")
@@ -318,33 +510,51 @@ def gen_md5s(map_dict, out_tab):
             forward_read_file = map_dict[key][0]
             reverse_read_file = map_dict[key][1]
 
-            forward_md5_out = subprocess.run(['md5sum', forward_read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
-            reverse_md5_out = subprocess.run(['md5sum', reverse_read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+            # only running if file passed the gzip test
+            if forward_read_file not in problem_files_list:
 
-            # getting rid of filename (these come like this '3s9ckfjie  file.txt' from command-line md5sum program)
-            forward_md5_out = re.sub(" .*$", "", forward_md5_out).strip()
-            reverse_md5_out = re.sub(" .*$", "", reverse_md5_out).strip()
+                forward_md5_out = subprocess.run(['md5sum', forward_read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+    
+                # getting rid of filename (these come like this '3s9ckfjie  file.txt' from command-line md5sum program)
+                forward_md5_out = re.sub(" .*$", "", forward_md5_out).strip()
+                md5_dict[key] = [forward_md5_out]
 
-            md5_dict[key] = [forward_md5_out]
-            md5_dict[key].append(reverse_md5_out)
+            else:
+                md5_dict[key] = ["failed-gzip-test"]
+
+
+            if reverse_read_file not in problem_files_list:
+
+                reverse_md5_out = subprocess.run(['md5sum', reverse_read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+                reverse_md5_out = re.sub(" .*$", "", reverse_md5_out).strip()
+                md5_dict[key].append(reverse_md5_out)
+
+            else:
+
+                md5_dict[key].append("failed-gzip-test")
+
 
         # adding md5 values to output table
         new_tab = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["R1_md5", "R2_md5"])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
-        # writing out md5 file
+        # writing out md5 file (only including those that are not problematic)
         with open(md5_output_file, "w") as md5_out_file:
             
             for key in map_dict.keys():
                 
-                forward_file_name = map_dict[key][0]
-                reverse_file_name = map_dict[key][1]
+                forward_read_file = map_dict[key][0]
+                reverse_read_file = map_dict[key][1]
 
-                forward_file_md5 = md5_dict[key][0]
-                reverse_file_md5 = md5_dict[key][1]
+                if forward_read_file not in problem_files_list:
 
-                md5_out_file.write(str(forward_file_md5) + "\t" + str(forward_file_name) + "\n")
-                md5_out_file.write(str(reverse_file_md5) + "\t" + str(reverse_file_name) + "\n")
+                    forward_file_md5 = md5_dict[key][0]
+                    md5_out_file.write(str(forward_file_md5) + "  " + str(forward_read_file) + "\n")
+
+                if reverse_read_file not in problem_files_list:
+
+                    reverse_file_md5 = md5_dict[key][1]
+                    md5_out_file.write(str(reverse_file_md5) + "  " + str(reverse_read_file) + "\n")
 
     else:
 
@@ -352,11 +562,18 @@ def gen_md5s(map_dict, out_tab):
 
             read_file = map_dict[key][0]
 
-            md5_out = subprocess.run(['md5sum', read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+            # only running if file passed the gzip test
+            if read_file not in problem_files_list:
 
-            # getting rid of filename (these come like this '3s9ckfjie  file.txt' from command-line md5sum program)
-            md5_out = re.sub(" .*$", "", md5_out).strip()
-            md5_dict[key] = [md5_out]
+                md5_out = subprocess.run(['md5sum', read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+
+                # getting rid of filename (these come like this '3s9ckfjie  file.txt' from command-line md5sum program)
+                md5_out = re.sub(" .*$", "", md5_out).strip()
+                md5_dict[key] = [md5_out]
+
+            else:
+
+                md5_dict[key] = ["failed-gzip-test"]                
 
         # adding md5 values to output table
         new_tab = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["read_file_md5"])
@@ -367,16 +584,23 @@ def gen_md5s(map_dict, out_tab):
             
             for key in map_dict.keys():
                 
-                file_name = map_dict[key][0]
+                read_file = map_dict[key][0]
 
-                file_md5 = md5_dict[key][0]
+                if read_file not in problem_files_list:
 
-                md5_out_file.write(str(file_md5) + "\t" + str(file_name) + "\n")
+                    file_md5 = md5_dict[key][0]
+                    md5_out_file.write(str(file_md5) + "  " + str(read_file) + "\n")
+
 
     return(map_dict, out_tab)
 
 
-def run_fastqc_and_multiqc(map_dict):
+def write_new_md5s_file(md5_df, out_tab):
+    """ writes out a new md5 file with renamed files """
+
+
+
+def run_fastqc_and_multiqc(map_dict, problem_files_list):
     """ runs fastqc on all read files """
 
     print_notification("Running fastqc...")
@@ -386,10 +610,14 @@ def run_fastqc_and_multiqc(map_dict):
 
     for key in map_dict.keys():
 
-        list_of_all_files += map_dict[key]
+        # only adding if passed the gzip test (and therefore filename isn't in the problem_files_list)
+        for file in map_dict[key]:
+            if file not in problem_files_list:
+                list_of_all_files += [file]
 
     # converting list to space-delimited string for passing to subprocess
     list_for_subprocess = " ".join(list_of_all_files)
+
     # building command since i can't figure out how to pass a list or space-delimited string of positional
     # arguments to subprocess.run
     with open(log_out, "w") as log:
@@ -403,7 +631,7 @@ def run_fastqc_and_multiqc(map_dict):
     with open(log_out, "a") as log:
         log.write("\n\n    MULTIQC log:\n\n")
 
-    multiqc_command = "multiqc ./ >> " + str(log_out) + " 2>&1"
+    multiqc_command = "multiqc ./ --force --filename " + str(multiqc_output_prefix) + " >> " + str(log_out) + " 2>&1"
 
     subprocess.run([multiqc_command], shell = True)
 
@@ -414,56 +642,138 @@ def run_fastqc_and_multiqc(map_dict):
             os.remove(file)
 
 
-def parse_and_add_read_counts(map_dict, out_tab):
+def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list):
     """ this gets the read counts from the multiqc output and adds them to the summary table """
 
-    df = pd.read_csv("multiqc_data/multiqc_general_stats.txt", sep = "\t", usecols = [0,5])
-    df.columns = ["sample", "counts"]
-    df.set_index("sample", inplace = True)
+    multiqc_general_stats_df = pd.read_csv(str(multiqc_output_prefix) + "_data/multiqc_general_stats.txt", sep = "\t", usecols = [0,5])
+    multiqc_general_stats_df.columns = ["sample", "counts"]
+    multiqc_general_stats_df.set_index("sample", inplace = True)
 
-    # making dictionary of counts 
-    counts_dict = {}
+    multiqc_fastqc_df = pd.read_csv(str(multiqc_output_prefix) + "_data/multiqc_fastqc.txt", sep = "\t", usecols = [0,6,9])
+    multiqc_fastqc_df.columns = ["sample", "length_range", "avg_length"]
+    multiqc_fastqc_df.set_index("sample", inplace = True)
+
+    # making dictionary of counts, length ranges, and average lengths
+    counts_dict, length_range_dict, avg_length_dict = {}, {}, {}
 
     if not args.single_ended:
 
         for key in map_dict.keys():
 
-            forward_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][0])
-            reverse_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][1])
+            # only getting info if the file passed the gzip test
+            if map_dict[key][0] not in problem_files_list:
 
-            num_forward_reads = round(df.loc[forward_read_multiqc_ID, 'counts'])
-            num_reverse_reads = round(df.loc[reverse_read_multiqc_ID, 'counts'])
+                forward_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][0])
 
-            counts_dict[key] = [num_forward_reads]
-            counts_dict[key].append(num_reverse_reads)
+                num_forward_reads = round(multiqc_general_stats_df.loc[forward_read_multiqc_ID, 'counts'])
+                forward_read_length_range = multiqc_fastqc_df.loc[forward_read_multiqc_ID, 'length_range']
+                forward_avg_read_length = multiqc_fastqc_df.loc[forward_read_multiqc_ID, 'avg_length']
+
+                counts_dict[key] = [num_forward_reads]
+                length_range_dict[key] = [forward_read_length_range]
+                avg_length_dict[key] = [forward_avg_read_length]
+
+            else: 
+
+                num_forward_reads = "fwd-failed-gzip-test"
+                counts_dict[key] = ["failed-gzip-test"]
+                length_range_dict[key] = ["failed-gzip-test"]
+                avg_length_dict[key] = ["failed-gzip-test"]
+
+                forward_avg_read_length = "fwd-failed-gzip-test"
+
+
+            # only getting info if the file passed the gzip test
+            if map_dict[key][1] not in problem_files_list:
+
+                reverse_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][1])
+
+                num_reverse_reads = round(multiqc_general_stats_df.loc[reverse_read_multiqc_ID, 'counts'])
+                reverse_read_length_range = multiqc_fastqc_df.loc[reverse_read_multiqc_ID, 'length_range']
+                reverse_avg_read_length = multiqc_fastqc_df.loc[reverse_read_multiqc_ID, 'avg_length']
+
+                counts_dict[key].append(num_reverse_reads)
+                length_range_dict[key].append(reverse_read_length_range)
+                avg_length_dict[key].append(reverse_avg_read_length)
+
+            else:
+
+                num_reverse_reads = "rev-failed-gzip-test"
+                counts_dict[key].append("failed-gzip-test")
+                length_range_dict[key].append("failed-gzip-test")
+                avg_length_dict[key].append("failed-gzip-test")
+
+                reverse_avg_read_length = "rev-failed-gzip-test"
 
             # adding value for if counts are equal
             if num_forward_reads == num_reverse_reads:
 
-                counts_dict[key].append("True")
+                counts_dict[key].append("YES")
 
             else:
 
-                counts_dict[key].append("False")
+                counts_dict[key].append("NO")
+
+            # adding value for if read lengths are equal
+            if forward_read_length_range == reverse_read_length_range and forward_avg_read_length == reverse_avg_read_length:
+
+                avg_length_dict[key].append("YES")
+
+            else:
+
+                avg_length_dict[key].append("NO")
+
 
         # adding read counts to output table
         new_tab = pd.DataFrame.from_dict(counts_dict, orient = "index", columns = ["R1_num_reads", "R2_num_reads", "R1_and_R2_num_reads_equal"])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+        # adding read length ranges to output table
+        new_tab = pd.DataFrame.from_dict(length_range_dict, orient = "index", columns = ["R1_read_length_range", "R2_read_length_range"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)        
+
+        # adding read avg lengths to output table
+        new_tab = pd.DataFrame.from_dict(avg_length_dict, orient = "index", columns = ["R1_avg_read_length", "R2_avg_read_length", "R1_and_R2_read_lengths_equal"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)        
+
 
     # handling if single-end
     else:
 
         for key in map_dict.keys():
 
-            read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][0])
-        
-            num_reads = round(df.loc[read_multiqc_ID, 'counts'])
+            # only working in if the file passed the gzip test
+            if map_dict[key][0] not in problem_files_list:
 
-            counts_dict[key] = [num_reads]
+                read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][0])
+
+                num_reads = round(multiqc_general_stats_df.loc[read_multiqc_ID, 'counts'])
+                read_length_range = multiqc_fastqc_df.loc[read_multiqc_ID, 'length_range']
+                avg_read_length = multiqc_fastqc_df.loc[read_multiqc_ID, 'avg_length']
+
+                counts_dict[key] = [num_reads]
+                length_range_dict[key] = [read_length_range]
+                avg_length_dict[key] = [avg_read_length]
+
+            else:
+
+                counts_dict[key] = ["failed-gzip-test"]
+                length_range_dict[key] = ["failed-gzip-test"]
+                avg_length_dict[key] = ["failed-gzip-test"]
 
         # adding read counts to output table
         new_tab = pd.DataFrame.from_dict(counts_dict, orient = "index", columns = ["read_counts"])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+
+        # adding read length ranges to output table
+        new_tab = pd.DataFrame.from_dict(length_range_dict, orient = "index", columns = ["read_length_range"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)        
+
+        # adding read avg lengths to output table
+        new_tab = pd.DataFrame.from_dict(avg_length_dict, orient = "index", columns = ["avg_read_length"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)        
+
 
     return(out_tab)
 
