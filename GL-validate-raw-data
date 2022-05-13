@@ -12,10 +12,11 @@ import pandas as pd
 import glob
 import re
 import subprocess
+import shutil
 
 parser = argparse.ArgumentParser(description = "This program validates GeneLab raw datasets, renames files if needed \
                                                 to follow GL convention, checks and/or creates md5s, and \
-                                                runs fastqc combines its outputs with multiqc. It is meant to be \
+                                                runs fastqc and combines its outputs with multiqc. It is meant to be \
                                                 executed in the directory holding the read files. \
                                                 For version info, run `GL-version`.",
                                  epilog = "Ex. usage: GL-validate-raw-data -g GLDS-480 -n 3")
@@ -46,12 +47,12 @@ standard_GL_R1_suffix = "_R1_raw.fastq.gz"
 standard_GL_R2_suffix = "_R2_raw.fastq.gz"
 standard_GL_SE_suffix = "_raw.fastq.gz"
 
-md5_output_file = str(args.GLDS_ID) + "-raw-read-md5s.txt"
-md5_check_output_file = str(args.GLDS_ID) + "-raw-read-md5-check-results.txt"
+md5_output_file = str(args.GLDS_ID) + "-raw-md5s.txt"
+md5_check_output_file = str(args.GLDS_ID) + "-raw-md5-check-results.txt"
 fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
 multiqc_output_prefix = str(args.GLDS_ID) + "-raw-multiqc"
 
-log_out = str(args.GLDS_ID) + "-raw-validation-log.txt"
+log_out = str(args.GLDS_ID) + "-fastqc-multiqc-log.txt"
 
 output_table_filename = str(args.GLDS_ID) + "-raw-validation-summary.tsv"
 
@@ -73,7 +74,7 @@ def main():
 
     # renaming files to be in our convention (e.g., _R1_raw.fastq.gz for forward, or "_raw.fastq.gz" 
     # if single-end), also adding to output table
-    map_dict, out_tab = rename_files(map_dict, out_tab)
+    map_dict, out_tab, files_renamed = rename_files(map_dict, out_tab)
 
     # checking gzip integrity
     map_dict, out_tab, problem_files_list = check_gzip_integrity(map_dict, out_tab)
@@ -86,8 +87,9 @@ def main():
     else:
         # adding them to the output summary table now if they were provided
         out_tab = pd.concat([out_tab, md5_df], axis = 1)
+
         # writing out new md5s file with renamed filenames
-        write_new_md5s_file(md5_df, out_tab)
+        write_new_md5s_file(map_dict, md5_df, problem_files_list, files_renamed)
 
     # run fastqc and multiqc
     run_fastqc_and_multiqc(map_dict, problem_files_list)
@@ -307,7 +309,7 @@ def rename_files(map_dict, out_tab):
             if not R2_orig_name.endswith(standard_GL_R2_suffix):
 
                 files_renamed = True
-                
+
                 R2_new_name = str(key) + str(standard_GL_R2_suffix)
                 os.rename(R2_orig_name, R2_new_name)
                 current_map_dict[key].append(R2_new_name)
@@ -595,9 +597,51 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
     return(map_dict, out_tab)
 
 
-def write_new_md5s_file(md5_df, out_tab):
+def write_new_md5s_file(map_dict, md5_df, problem_files_list, files_renamed):
     """ writes out a new md5 file with renamed files """
 
+    # just making a copy of the original if we didn't rename things
+    if not files_renamed:
+        shutil.copy(args.md5_file, md5_output_file)
+
+    md5_dict = {}
+
+    # if paired-end
+    if not args.single_ended:
+
+        with open(md5_output_file, "w") as md5_out_file:
+
+            for key in map_dict.keys():
+
+                forward_read_file = map_dict[key][0]
+                reverse_read_file = map_dict[key][1]
+
+                # only writing out if they passed the gzip test
+                if forward_read_file not in problem_files_list:
+
+                    forward_file_md5 = md5_df.loc[key].R1_md5
+                    md5_out_file.write(str(forward_file_md5) + "  " + str(forward_read_file) + "\n")
+
+                if reverse_read_file not in problem_files_list:
+
+                    reverse_file_md5 = md5_df.loc[key].R2_md5
+                    md5_out_file.write(str(reverse_file_md5) + "  " + str(reverse_read_file) + "\n")
+
+
+    # if single-end
+    else:
+
+        with open(md5_output_file, "w") as md5_out_file:
+
+            for key in map_dict.keys():
+
+                read_file = map_dict[key][0]
+
+                # only writing out if they passed the gzip test
+                if read_file not in problem_files_list:
+
+                    file_md5 = md5_df.loc[key].md5
+                    md5_out_file.write(str(file_md5) + "  " + str(read_file) + "\n")
 
 
 def run_fastqc_and_multiqc(map_dict, problem_files_list):
@@ -639,7 +683,9 @@ def run_fastqc_and_multiqc(map_dict, problem_files_list):
     if not args.keep_fastqc_files:
         
         for file in glob.glob("*fastqc*"):
-            os.remove(file)
+
+            if file != log_out:
+                os.remove(file)
 
 
 def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list):
@@ -681,6 +727,7 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
                 avg_length_dict[key] = ["failed-gzip-test"]
 
                 forward_avg_read_length = "fwd-failed-gzip-test"
+                forward_read_length_range = "fwd-failed-gzip-test"
 
 
             # only getting info if the file passed the gzip test
@@ -704,6 +751,7 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
                 avg_length_dict[key].append("failed-gzip-test")
 
                 reverse_avg_read_length = "rev-failed-gzip-test"
+                reverse_read_length_range = "rev-failed-gzip-test"
 
             # adding value for if counts are equal
             if num_forward_reads == num_reverse_reads:
