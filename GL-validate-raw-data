@@ -47,12 +47,17 @@ standard_GL_R1_suffix = "_R1_raw.fastq.gz"
 standard_GL_R2_suffix = "_R2_raw.fastq.gz"
 standard_GL_SE_suffix = "_raw.fastq.gz"
 
-md5_output_file = str(args.GLDS_ID) + "-raw-md5s.txt"
+md5_output_file = "raw_md5sum.txt"
 md5_check_output_file = str(args.GLDS_ID) + "-raw-md5-check-results.txt"
 fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
-multiqc_output_prefix = str(args.GLDS_ID) + "-raw-multiqc"
+multiqc_output_prefix = "raw_multiqc"
+multiqc_data_dir = multiqc_output_prefix + "_data"
+multiqc_html = multiqc_output_prefix + ".html"
+multiqc_dir = multiqc_output_prefix + "_report"
 
-log_out = str(args.GLDS_ID) + "-fastqc-multiqc-log.txt"
+versions_used_file = str(args.GLDS_ID) + "-raw-validation-tool-versions.txt"
+
+log_out = str(args.GLDS_ID) + "-raw-fastqc-multiqc-log.txt"
 
 output_table_filename = str(args.GLDS_ID) + "-raw-validation-summary.tsv"
 
@@ -103,6 +108,16 @@ def main():
     out_tab.to_csv(output_table_filename, sep = "\t", index = False)
 
 
+    # making directory for multiqc outputs and zipping
+    package_and_zip_multiqc_outputs()
+
+    # making md5 for zipped qc dir and adding to md5s file
+    gen_and_add_multiqc_zip_md5()
+
+    # finish message
+    finish_message(problem_files_list)
+
+
 ################################################################################
 
 # setting some colors
@@ -132,7 +147,7 @@ def wprint(text):
 def report_failure(message, color = "red"):
     print("")
     wprint(color_text(message, color))
-    print("\nRaw data V+V failed.\n")
+    print("\nRaw data V+V is exiting without completing.\n")
     sys.exit(1)
 
 
@@ -166,7 +181,6 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
             report_failure("We expected " + str(args.number_of_samples) + " read files, but " + str(num_files) + " were detected.")
 
 
-
     # making sure they have the expected R1/R2 designations if paired-end data
     if not args.single_ended:
 
@@ -178,16 +192,17 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
 
         if args.number_of_samples != num_forward_read_files:
 
-            report_failure("We expected " + str(args.number_of_samples) + " forward read files, but " + str(num_forward_read_files) + " were found based on currently allowed paired-read designations (e.g. these formats: " + ', '.join(R1_designations) + "). Share this use-case with Mike to expand functionality as others are needed.")
+            report_failure("We expected " + str(args.number_of_samples) + " forward read files, but " + str(num_forward_read_files) + " were found based on currently allowed read-pair designations (e.g. these formats: " + ', '.join(R1_designations) + "). If it's not clear what the problem is here, share this use-case with Mike so we can expand functionality if needed.")
 
         if args.number_of_samples != num_reverse_read_files:
 
-            report_failure("We expected " + str(args.number_of_samples) + " reverse read files, but " + str(num_forward_read_files) + " were found based on currently allowed paired-read designations (e.g. these formats: " + ', '.join(R2_designations) + "). Share this use-case with Mike to expand functionality as others are needed.")
+            report_failure("We expected " + str(args.number_of_samples) + " reverse read files, but " + str(num_forward_read_files) + " were found based on currently allowed read-pair designations (e.g. these formats: " + ', '.join(R2_designations) + "). If it's not clear what the problem is here, share this use-case with Mike so we can expand functionality if needed")
+
 
     # making a dictionary with unique IDs as keys and a list of read files as values
     if not args.single_ended:
 
-        # finding which read-pair designation we are using here (superfluous until we add more, but will be needed then)
+        # finding which read-pair designation we are using here (these are set in a list at top of script if wanting to add more)
         # putting a check that only one is found (one mechanism to hopefully prevent if these patterns are just part of a 
         # sample name, and not a read-pair designation)
 
@@ -231,6 +246,7 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
 
         return(map_dict)
 
+
     # now the case if single-end data
     else:
 
@@ -262,11 +278,25 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
 def start_validation_output_table(map_dict):
     """ starts output table and adds unique IDs and file names """
 
+    # getting count of files for each entry and putting into dictionary to add to summary output table
+    files_count_dict = {}
+
+    for key in map_dict.keys():
+
+        files_count_dict[key] = len(map_dict[key])
+
+    # starting output summary table
+    out_tab = pd.DataFrame.from_dict(files_count_dict, orient = "index", columns = ['num_read_files'])
+
+    # adding info on original file names
     if not args.single_ended:
-        out_tab = pd.DataFrame.from_dict(map_dict, orient = "index", columns = ['orig_R1_filename', 'orig_R2_filename'])
+
+        new_tab = pd.DataFrame.from_dict(map_dict, orient = "index", columns = ['orig_R1_filename', 'orig_R2_filename'])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
     else:
-        out_tab = pd.DataFrame.from_dict(map_dict, orient = "index", columns = ['orig_read_filename'])
+        new_tab = pd.DataFrame.from_dict(map_dict, orient = "index", columns = ['orig_read_filename'])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
     return(out_tab)
 
@@ -645,7 +675,7 @@ def write_new_md5s_file(map_dict, md5_df, problem_files_list, files_renamed):
 
 
 def run_fastqc_and_multiqc(map_dict, problem_files_list):
-    """ runs fastqc on all read files """
+    """ runs fastqc on all read files and writes out versions to file """
 
     print_notification("Running fastqc...")
 
@@ -662,18 +692,25 @@ def run_fastqc_and_multiqc(map_dict, problem_files_list):
     # converting list to space-delimited string for passing to subprocess
     list_for_subprocess = " ".join(list_of_all_files)
 
+
+    # getting fastqc version
+    fastqc_version = subprocess.run(['fastqc', '--version'], stdout = subprocess.PIPE).stdout.decode('utf-8')
+
     # building command since i can't figure out how to pass a list or space-delimited string of positional
     # arguments to subprocess.run
     with open(log_out, "w") as log:
-        log.write("\n\n    FASTQC log:\n\n")
+        log.write("\n\n    " + str(fastqc_version).strip() + " log:\n\n")
 
     fastqc_command = "fastqc -t " + str(fastqc_threads) + " " + str(list_for_subprocess) + " >> " + str(log_out) + " 2>&1"
 
     subprocess.run([fastqc_command], shell = True)
 
+    # getting multiqc version
+    multiqc_version = subprocess.run(['multiqc', '--version'], stdout = subprocess.PIPE).stdout.decode('utf-8').replace(", version ", " v")
+
     # running multiqc
     with open(log_out, "a") as log:
-        log.write("\n\n    MULTIQC log:\n\n")
+        log.write("\n\n    " + str(multiqc_version).strip() + " log:\n\n")
 
     multiqc_command = "multiqc ./ --force --filename " + str(multiqc_output_prefix) + " >> " + str(log_out) + " 2>&1"
 
@@ -687,6 +724,11 @@ def run_fastqc_and_multiqc(map_dict, problem_files_list):
             if file != log_out:
                 os.remove(file)
 
+    # writing out versions used to file
+    with open(versions_used_file, "w") as out_file:
+
+        out_file.write(str(fastqc_version) + str(multiqc_version))
+
 
 def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list):
     """ this gets the read counts from the multiqc output and adds them to the summary table """
@@ -699,8 +741,8 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
     multiqc_fastqc_df.columns = ["sample", "length_range", "avg_length"]
     multiqc_fastqc_df.set_index("sample", inplace = True)
 
-    # making dictionary of counts, length ranges, and average lengths
-    counts_dict, length_range_dict, avg_length_dict = {}, {}, {}
+    # making dictionary of counts, length ranges, average lengths, and number of fastqc files present in the multiqc report
+    counts_dict, length_range_dict, avg_length_dict, fastqc_files_count = {}, {}, {}, {}
 
     if not args.single_ended:
 
@@ -719,6 +761,8 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
                 length_range_dict[key] = [forward_read_length_range]
                 avg_length_dict[key] = [forward_avg_read_length]
 
+                fastqc_files_count[key] = 1
+
             else: 
 
                 num_forward_reads = "fwd-failed-gzip-test"
@@ -728,6 +772,8 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
                 forward_avg_read_length = "fwd-failed-gzip-test"
                 forward_read_length_range = "fwd-failed-gzip-test"
+
+                fastqc_files_count[key] = 0
 
 
             # only getting info if the file passed the gzip test
@@ -743,6 +789,8 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
                 length_range_dict[key].append(reverse_read_length_range)
                 avg_length_dict[key].append(reverse_avg_read_length)
 
+                fastqc_files_count[key] += 1
+
             else:
 
                 num_reverse_reads = "rev-failed-gzip-test"
@@ -752,6 +800,8 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
                 reverse_avg_read_length = "rev-failed-gzip-test"
                 reverse_read_length_range = "rev-failed-gzip-test"
+
+                fastqc_files_count[key] += 0
 
             # adding value for if counts are equal
             if num_forward_reads == num_reverse_reads:
@@ -782,7 +832,12 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
         # adding read avg lengths to output table
         new_tab = pd.DataFrame.from_dict(avg_length_dict, orient = "index", columns = ["R1_avg_read_length", "R2_avg_read_length", "R1_and_R2_read_lengths_equal"])
-        out_tab = pd.concat([out_tab, new_tab], axis = 1)        
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+        # adding num fastqc files in multiqc report
+        new_tab = pd.DataFrame.from_dict(fastqc_files_count, orient = "index", columns = ["num_fastqc_reports_in_multiqc_report"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
 
 
     # handling if single-end
@@ -803,11 +858,16 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
                 length_range_dict[key] = [read_length_range]
                 avg_length_dict[key] = [avg_read_length]
 
+                fastqc_files_count[key] = 1
+
             else:
 
                 counts_dict[key] = ["failed-gzip-test"]
                 length_range_dict[key] = ["failed-gzip-test"]
                 avg_length_dict[key] = ["failed-gzip-test"]
+
+                fastqc_files_count[key] = 0
+
 
         # adding read counts to output table
         new_tab = pd.DataFrame.from_dict(counts_dict, orient = "index", columns = ["read_counts"])
@@ -822,8 +882,54 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
         new_tab = pd.DataFrame.from_dict(avg_length_dict, orient = "index", columns = ["avg_read_length"])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)        
 
+        # adding num fastqc files in multiqc report
+        new_tab = pd.DataFrame.from_dict(fastqc_files_count, orient = "index", columns = ["num_fastqc_reports_in_multiqc_report"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
     return(out_tab)
+
+
+def package_and_zip_multiqc_outputs():
+    """ moves multiqc outputs into their own dir and zips it """
+
+    try:
+        os.mkdir(multiqc_dir)
+    except:
+        pass
+
+    shutil.move(multiqc_data_dir, multiqc_dir)
+    shutil.move(multiqc_html, multiqc_dir)
+
+    # zipping multiqc dir
+    zip_command = "zip -q -m -r " + str(multiqc_dir) + ".zip " + str(multiqc_dir)
+
+    subprocess.run([zip_command], shell = True)
+
+
+def gen_and_add_multiqc_zip_md5():
+    """ generates and adds multiqc zip md5 to md5 file """
+
+    zip_file = str(multiqc_dir) + ".zip"
+    zip_md5_out = subprocess.run(['md5sum', zip_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+
+    with open(md5_output_file, "a") as out_file:
+
+        out_file.write(zip_md5_out)
+
+
+def finish_message(problem_files_list):
+    """ reports when done, and notes if there were any files that did not pass the gzip test """
+
+    print_notification("Program complete :)", "green")
+
+    if len(problem_files_list) > 0:
+
+        print_notification("NOTICE: " + str(len(problem_files_list)) + " file(s) did not pass the gzip integrity test (i.e., they are corrupted).", "red")
+
+        print("    These are therefore currently missing from the multiqc output as well as the")
+        print("    'raw_md5sum.txt'. You can find which these are in the generated summary table.\n\n")
+
+
 
 
 if __name__ == "__main__":
