@@ -32,8 +32,12 @@ required.add_argument("-p", "--pattern", help = "If we do not want to download a
 
 parser.add_argument("-j", "--jobs", help = "Number of downloads to run in parallel (default: 10)", default = 10, action = "store", type = int)
 
-parser.add_argument("--print-only", help = "Just print out the files that would be downloaded, rather than downloading them\
+parser.add_argument("-P", "--print-only", help = "Just print out the files that would be downloaded, rather than downloading them \
                                                   (useful to check we are getting what we want first)", action = "store_true")
+
+parser.add_argument("-f", "--force", help = "Don't ask for confirmation to begin download (helpful if wanting to \
+                                                  run non-interactively)", action = "store_true")
+
 
 
 if len(sys.argv)==1:
@@ -111,74 +115,74 @@ def main():
         print("")
         exit(0)
 
-    else:
+    if not args.force:
 
         report_message(f"If you'd just like to see a list of the files that would be downloaded, here is your chance to exit and rerun the command with the '--print-only' flag...")
-        sleep(3)
+        sleep(1)
         print("")
 
-    print(f"    Enter 'y' if you'd like to begin downloading these {num_files_to_download} files,")
-    response = input("    enter any other key to exit without downloading: ")
+        print(f"    Enter 'y' if you'd like to begin downloading these {num_files_to_download} files,")
+        response = input("    enter any other key to exit without downloading: ")
 
-    if response != "y":
+        if response != "y":
 
-        report_message(f"Exiting without downloading :)")
-        print("")
-        exit(0)
-
-    else:
-
-        print("")
-
-        # building download script based on curl
-        beginning_of_command = "curl -L -s -o"
-
-        with open(download_commands_file, "w") as download_script:
-
-            for index, row in download_tab.iterrows():
-
-                filename = row["filename"]
-                url = row["url"]
-
-                download_script.write(f"{beginning_of_command} {filename} {url}\n")
-
-
-        report_message(f"Beginning download of the {num_files_to_download} files...")
-        print("")
-
-        dl_command = f"parallel --xapply -j {args.jobs} < {download_commands_file}"
-
-        subprocess.run(dl_command, shell = True)
-        
-        # checking expected files were downloaded
-        cwd_files = os.listdir(".")
-
-        missing_files = []
-
-        for file in download_tab.filename:
-
-            if file not in cwd_files:
-
-                missing_files.append(file)
-
-        num_missing = len(missing_files)
-
-        if num_missing > 0:
-
-            with open(not_downloaded_files_file, "w") as out_file:
-                for file in missing_files:
-                    out_file.write(f"{file}\n")
-
-            report_message(f"Some files ({num_missing}) weren't successfully downloaded for some reason. They have been written to:")
-            print(f"    {not_downloaded_files_file}\n")
+            report_message(f"Exiting without downloading :)")
+            print("")
+            exit(0)
 
         else:
 
-            report_message(f"All {num_files_to_download} files have been downloaded :)", "green")
             print("")
 
-        report_message(f"The commands executed were written to:")
-        print(f"    {download_commands_file}\n")
+    # building download script based on curl
+    beginning_of_command = "curl -L -s -o"
+
+    with open(download_commands_file, "w") as download_script:
+
+        for index, row in download_tab.iterrows():
+
+            filename = row["filename"]
+            url = row["url"]
+
+            download_script.write(f"{beginning_of_command} {filename} {url}\n")
+
+
+    report_message(f"Beginning download of the {num_files_to_download} files...")
+    print("")
+
+    dl_command = f"parallel --xapply -j {args.jobs} < {download_commands_file}"
+
+    subprocess.run(dl_command, shell = True)
+    
+    # checking expected files were downloaded
+    cwd_files = os.listdir(".")
+
+    missing_files = []
+
+    for file in download_tab.filename:
+
+        if file not in cwd_files:
+
+            missing_files.append(file)
+
+    num_missing = len(missing_files)
+
+    if num_missing > 0:
+
+        with open(not_downloaded_files_file, "w") as out_file:
+            for file in missing_files:
+                out_file.write(f"{file}\n")
+
+        report_message(f"Some files ({num_missing}) weren't successfully downloaded for some reason. They have been written to:")
+        print(f"    {not_downloaded_files_file}\n")
+
+    else:
+
+        report_message(f"All {num_files_to_download} files have been downloaded :)", "green")
+        print("")
+
+    report_message(f"The commands executed were written to:")
+    print(f"    {download_commands_file}\n")
 
 
 ################################################################################
