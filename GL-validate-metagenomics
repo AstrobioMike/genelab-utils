@@ -360,6 +360,21 @@ def check_assembly_based_file(sample, file_path, failed_assemblies_list, assembl
             report_failure("The file '" + str(file_path) + "' is empty, but that sample isn't noted in the 'Failed-assemblies.tsv' file as it should be if the assembly failed.")
 
 
+def check_assembly_based_genes_file(sample, file_path, failed_assemblies_list, assembly = True):
+    """ 
+    separate function for working with expected output genes files, to handle
+    cases where assemblies can succeed while there are still no gene calls
+
+    just checks the file isn't empty if it exists
+    """
+
+    if os.path.exists(file_path) and sample not in failed_assemblies_list:
+
+        if not os.path.getsize(file_path) > 0:
+
+            report_failure("The expected file '" + str(file_path) + "' exists, but appears to be empty when it shouldn't be.")
+
+
 def check_assembly_based_outputs(sample_names, failed_assemblies_list, successful_assemblies_list):
     """ makes sure outputs exist and checks formatting """
 
@@ -369,13 +384,13 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
         curr_fasta_path = assemblies_dir + sample + assembly_suffix
 
         # checking the file is present and not empty, unless it is noted in the Failed-assemblies file, then continuing to next sample
-        check_assembly_based_file(sample, curr_fasta_path, failed_assemblies_list)
-
-        # checking the general fasta format if present
         if sample not in failed_assemblies_list:
 
-            check_general_fasta_format(curr_fasta_path)
+            check_assembly_based_file(sample, curr_fasta_path, failed_assemblies_list)
 
+            # checking the general fasta format if present
+            check_general_fasta_format(curr_fasta_path)
+    
     # making sure assembly summary file is there
     assembly_summary_path = assemblies_dir + additional_prefix + "assembly-summaries.tsv"
 
@@ -387,24 +402,24 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
     predicted_gene_file_suffixes = ["-genes.faa", "-genes.gff", "-genes.fasta"]
     gene_fasta_suffixes = ["-genes.faa", "-genes.fasta"]
 
-    # if any assemblies failed, these files will be present but empty (they may be empty if an assembly produced contigs too)
+    # if any assemblies failed, these files won't exist for that assembly (they also may not exist if an assembly produced contigs too but not genes were called)
     for sample in sample_names:
 
-        for suffix in predicted_gene_file_suffixes:
-
-            curr_file_path = genes_dir + sample + suffix
-
-            # checking the file is present and not empty unless it is noted in the Failed-assemblies file
-            check_assembly_based_file(sample, curr_file_path, failed_assemblies_list, assembly = False)
-
-        # checking fasta format for those that have stuff in them
         if sample not in failed_assemblies_list:
 
+            for suffix in predicted_gene_file_suffixes:
+
+                curr_file_path = genes_dir + sample + suffix
+
+                # checking the file is not empty if it is present
+                check_assembly_based_genes_file(sample, curr_file_path, failed_assemblies_list, assembly = False)
+
+            # checking fasta format for those that exist
             for suffix in gene_fasta_suffixes:
 
                 curr_fasta_path = genes_dir + sample + suffix
 
-                if os.path.getsize(curr_fasta_path) > 0:
+                if os.path.exists(curr_fasta_path) and os.path.getsize(curr_fasta_path) > 0:
                     check_general_fasta_format(curr_fasta_path)
 
 
@@ -431,7 +446,8 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
             curr_file_path = mapping_dir + sample + suffix
 
             # checking the file is present and not empty unless it is noted in the Failed-assemblies file
-            check_assembly_based_file(sample, curr_file_path, failed_assemblies_list)
+            if sample not in failed_assemblies_list:
+                check_assembly_based_file(sample, curr_file_path, failed_assemblies_list)
 
         # checking for mapping-info file for those that should have it
         if sample not in failed_assemblies_list:
@@ -557,4 +573,3 @@ def check_processing_tar(samples):
 
 if __name__ == "__main__":
     main()
-
