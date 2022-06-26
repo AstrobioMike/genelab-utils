@@ -50,7 +50,7 @@ logs_dir = additional_prefix + "processing_info/logs/"
 
 expected_dirs = [raw_reads_dir, fastqc_dir, filtered_reads_dir, assembly_based_dir,
                  assemblies_dir, genes_dir, annotations_and_tax_dir, mapping_dir,
-                 combined_output_dir, bins_dir, MAGs_dir, read_based_dir, logs_dir]
+                 combined_output_dir, bins_dir, MAGs_dir, read_based_dir]
 
 assembly_based_dirs = [assemblies_dir, genes_dir, annotations_and_tax_dir, mapping_dir,
                        combined_output_dir, bins_dir, MAGs_dir]
