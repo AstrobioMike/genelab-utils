@@ -729,6 +729,10 @@ def run_fastqc_and_multiqc(map_dict, problem_files_list):
 
         out_file.write(str(fastqc_version) + str(multiqc_version))
 
+        out_file.write("\nProtocol text:\n\n")
+        out_file.write("Quality assessment of reads was performed with FastQC " + str(fastqc_version).replace("FastQC ", "").replace("\n", "") + \
+                       " and reports were combined with MultiQC " + str(multiqc_version).replace("multiqc ", "").replace("\n", "") + ".\n\n")
+
 
 def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list):
     """ this gets the read counts from the multiqc output and adds them to the summary table """
@@ -934,4 +938,3 @@ def finish_message(problem_files_list):
 
 if __name__ == "__main__":
     main()
-
