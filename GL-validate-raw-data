@@ -30,14 +30,13 @@ parser.add_argument("-m", "--md5-file", help = "Include a file holding all md5su
                     action = "store", default = "")
 parser.add_argument("-s", "--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
 parser.add_argument("-k", "--keep-fastqc-files", help = "Add this flag if wanting to keep individual-sample fastqc files", action = "store_true")
-
+parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
     sys.exit(0)
 
 args = parser.parse_args()
-
 
 # currently hard-coded things we may want to adjust
 R1_designations = ["_R1_", "_R1."]
@@ -61,61 +60,74 @@ log_out = str(args.GLDS_ID) + "-raw-fastqc-multiqc-log.txt"
 
 output_table_filename = str(args.GLDS_ID) + "-raw-validation-summary.tsv"
 
+if args.slurm:
+
+    sbatch_file = str(args.GLDS_ID) + "-raw-validation.slurm"
+    slurm_out_file = str(args.GLDS_ID) + "-raw-validation-slurm.out"
+    slurm_job_name = str(args.GLDS_ID) + "-raw-validation"
+    slurm_mem = 3000
 
 ################################################################################
 
 def main():
 
-    # creating mapping dictionary of files to unique sample IDs
-    map_dict = check_files_and_gen_unique_ID_to_file_map(args.number_of_samples)
+    if args.slurm:
 
-    # starting validation output table
-    out_tab = start_validation_output_table(map_dict)
-
-    # if an md5 file was provided, checking md5s before changing their names
-    if args.md5_file != "":
-
-        md5_df = check_md5s(map_dict, out_tab)
-
-    # renaming files to be in our convention (e.g., _R1_raw.fastq.gz for forward, or "_raw.fastq.gz" 
-    # if single-end), also adding to output table
-    map_dict, out_tab, files_renamed = rename_files(map_dict, out_tab)
-
-    # checking gzip integrity
-    map_dict, out_tab, problem_files_list = check_gzip_integrity(map_dict, out_tab)
-
-    # generating md5s if none were provided
-    if args.md5_file == "":
-
-        map_dict, out_tab = gen_md5s(map_dict, out_tab, problem_files_list)
+        # making command and submitting as slurm job if --slurm was specified
+        submit_slurm()
 
     else:
-        # adding them to the output summary table now if they were provided
-        out_tab = pd.concat([out_tab, md5_df], axis = 1)
 
-        # writing out new md5s file with renamed filenames
-        write_new_md5s_file(map_dict, md5_df, problem_files_list, files_renamed)
+        # creating mapping dictionary of files to unique sample IDs
+        map_dict = check_files_and_gen_unique_ID_to_file_map(args.number_of_samples)
 
-    # run fastqc and multiqc
-    run_fastqc_and_multiqc(map_dict, problem_files_list)
+        # starting validation output table
+        out_tab = start_validation_output_table(map_dict)
 
-    # add read counts to summary output table
-    out_tab = parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
+        # if an md5 file was provided, checking md5s before changing their names
+        if args.md5_file != "":
 
-    # writing output summary table
-    out_tab.reset_index(inplace = True)
-    out_tab = out_tab.rename(columns = {'index': 'unique_ID'})
-    out_tab.to_csv(output_table_filename, sep = "\t", index = False)
+            md5_df = check_md5s(map_dict, out_tab)
+
+        # renaming files to be in our convention (e.g., _R1_raw.fastq.gz for forward, or "_raw.fastq.gz" 
+        # if single-end), also adding to output table
+        map_dict, out_tab, files_renamed = rename_files(map_dict, out_tab)
+
+        # checking gzip integrity
+        map_dict, out_tab, problem_files_list = check_gzip_integrity(map_dict, out_tab)
+
+        # generating md5s if none were provided
+        if args.md5_file == "":
+
+            map_dict, out_tab = gen_md5s(map_dict, out_tab, problem_files_list)
+
+        else:
+            # adding them to the output summary table now if they were provided
+            out_tab = pd.concat([out_tab, md5_df], axis = 1)
+
+            # writing out new md5s file with renamed filenames
+            write_new_md5s_file(map_dict, md5_df, problem_files_list, files_renamed)
+
+        # run fastqc and multiqc
+        run_fastqc_and_multiqc(map_dict, problem_files_list)
+
+        # add read counts to summary output table
+        out_tab = parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
+
+        # writing output summary table
+        out_tab.reset_index(inplace = True)
+        out_tab = out_tab.rename(columns = {'index': 'unique_ID'})
+        out_tab.to_csv(output_table_filename, sep = "\t", index = False)
 
 
-    # making directory for multiqc outputs and zipping
-    package_and_zip_multiqc_outputs()
+        # making directory for multiqc outputs and zipping
+        package_and_zip_multiqc_outputs()
 
-    # making md5 for zipped qc dir and adding to md5s file
-    gen_and_add_multiqc_zip_md5()
+        # making md5 for zipped qc dir and adding to md5s file
+        gen_and_add_multiqc_zip_md5()
 
-    # finish message
-    finish_message(problem_files_list)
+        # finish message
+        finish_message(problem_files_list)
 
 
 ################################################################################
@@ -936,7 +948,67 @@ def finish_message(problem_files_list):
         print("    'raw_md5sum.txt'. You can find which these are in the generated summary table.\n\n")
 
 
+def submit_slurm():
+    """ making sbatch file and submitting as slurm job if `--slurm` was specified """
 
+    command_list = sys.argv
+    
+    # removing --slurm from list for command that will be placed in slurm batch script
+    command_list.remove("--slurm")
+
+    command_for_slurm_script = " ".join(command_list)
+
+    # building and writing out slurm sbatch file
+    with open(sbatch_file, "w") as out:
+
+        out.write('#!/bin/bash\n\n')
+
+        out.write('#SBATCH --job-name=' + str(slurm_job_name) + "\n")
+        out.write('#SBATCH --output=' + str(slurm_out_file) + "\n")
+        out.write('#SBATCH --mem=' + str(slurm_mem) + "\n\n")
+
+        out.write('# sourcing user profile\n')
+        out.write('. ~/.profile\n\n')
+
+        out.write('# enables regular conda activate robustly (had trouble with source activate)\n')
+        out.write('eval "$(conda shell.bash hook)"\n\n')
+
+        out.write('# tracking time\n')
+        out.write('start=$(date +%s)\n\n')
+
+        out.write('# printing out node that is running the job\n')
+        out.write('echo -e "Job running on node: ${HOSTNAME}\\n"\n\n')
+        
+        out.write('# activating sra-tools conda environment\n')
+        out.write('conda activate genelab-utils\n\n')
+
+        out.write('call="' + str(command_for_slurm_script) + '"\n\n')
+
+        out.write('# printing out command to log file\n')
+        out.write('echo -e "${call}\\n"\n\n')
+
+        out.write('# running the command\n')
+        out.write('eval ${call}\n')
+        out.write('echo ""\n\n')
+
+        out.write('# storing end time and reporting time taken\n')
+        out.write('end=$(date +%s)\n\n')
+
+        out.write('runtime_s=$(echo $(( end - start )))\n')
+        out.write('echo "total run time(s): $runtime_s"\n\n')
+
+        out.write('runtime_m=$(echo "scale=2; $runtime_s / 60;" | bc)\n')
+        out.write('runtime_h=$(echo "scale=2; $runtime_s / 3600;" | bc)\n\n')
+
+        out.write('echo "total run time(m): $runtime_m"\n')
+        out.write('echo -e "total run time(h): $runtime_h\\n"\n\n')
+
+        out.write('echo "slurm job ID: ${SLURM_JOB_ID}"\n')
+
+    # submitting the slurm job
+    os.system("sbatch " + str(sbatch_file))
+
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()
