@@ -269,6 +269,8 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
             # getting unique portion of names prior to fasta extension
             target_string_pattern = used_extension + ".*$"
             unique_ID = re.sub(target_string_pattern, "", file)
+            # here we are removing "_raw" from the end if it is present, so we don't inadvertently double it at the end of the unique portion of the sample ID
+            unique_ID = re.sub("_raw$", "", unique_ID)
 
             map_dict[unique_ID] = [file]
 
