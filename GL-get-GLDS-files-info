@@ -9,131 +9,150 @@ https://github.com/J-81/dp_tools/blob/a9e0401e4da0dc8002ea153184d5590bc41feedc/d
 for which he also had help from Kirill Grigorev.
 """
 
-import os
-import sys
-import argparse
-import textwrap
-from json import loads
-from urllib.request import urlopen
+print("\n    This script is deprecated, see 'GL-download-GLDS-data' help menu.\n")
 
-
-parser = argparse.ArgumentParser(description="This is a program for getting the files and links available \
-                                              for a given GLDS dataset. The output table can be given to \
-                                              the `GL-download-GLDS-data` program to download the files.\
-                                              For version info, run `GL-version`.")
-
-required = parser.add_argument_group('required arguments')
-
-required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True, type = str)
-
-if len(sys.argv)==1:
-    parser.print_help(sys.stderr)
-    sys.exit(0)
-
-args = parser.parse_args()
-
-# link variables
-base_genelab_url = "https://genelab-data.ndc.nasa.gov"
-base_download_link = os.path.join(base_genelab_url, "genelab/static/media/dataset/")
-GLDS_data_url = os.path.join(base_genelab_url, "genelab/data/study/data/", args.GLDS_ID)
-filelistings_url_prefix = os.path.join(base_genelab_url, "genelab/data/study/filelistings/")
-
-# output table with files and links
-output_file = args.GLDS_ID + "-files-and-links.tsv"
-
-################################################################################
-
-def main():
-
-    # making sure input fits format
-    if not args.GLDS_ID.startswith("GLDS-"):
-
-        report_message("The input --GLDS-ID argument needs to be in the format of 'GLDS-' followed by the appropriate GLDS number.")
-        print("")
-        exit(1)
-
-
-    # reading glds study data json in order to get the GeneLab ID
-    try:
-
-        report_message("Retrieving " + args.GLDS_ID + " study data from:")
-        print("    " + GLDS_data_url + "\n")
-
-        with urlopen(GLDS_data_url) as json:
-
-            glds_study_data_json = loads(json.read().decode())
-            GL_hash_ID = glds_study_data_json[0]["_id"]
-
-    except:
-        report_message(f"The input --GLDS-ID argument of {args.GLDS_ID} pointed us to the above address, but we couldn't find anything there :(")
-        print("")
-        exit(1)
-
-    filelistings_url = os.path.join(filelistings_url_prefix, GL_hash_ID)
-
-    report_message("Retrieving " + args.GLDS_ID + " files data from:")
-    print("    " + filelistings_url + "\n")
-
-    # reading fileslisting json
-    with urlopen(filelistings_url) as json:
-
-        files_json = loads(json.read().decode())
-
-
-    with open(output_file, "w") as out_file:
-
-        # starting header
-        out_file.write("filename\turl\n")
-
-        for entry in files_json:
-
-            filename = entry["file_name"]
-            file_version = entry["version"]
-            file_url = os.path.join(base_download_link, filename + "?version=" + str(file_version))
-
-            out_file.write(f"{filename}\t{file_url}\n")
-
-
-    report_message(f"Files and urls written to {output_file}", "green")
-    print(f"\n  Pass that file onto the `{color_text('GL-download-GLDS-data', 'yellow')}` program for downloading the data :)\n")
-
-################################################################################
+# import os
+# import sys
+# import argparse
+# import textwrap
+# from json import loads
+# from urllib.request import urlopen
+# import pandas as pd
 
 
 
-# setting some colors
-tty_colors = {
-    'green' : '\033[0;32m%s\033[0m',
-    'yellow' : '\033[0;33m%s\033[0m',
-    'red' : '\033[0;31m%s\033[0m'
-}
+# parser = argparse.ArgumentParser(description="This is a program for getting the files and links available \
+#                                               for a given GLDS dataset. The output table can be given to \
+#                                               the `GL-download-GLDS-data` program to download the files.\
+#                                               For version info, run `GL-version`.")
+
+# required = parser.add_argument_group('required arguments')
+
+# required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True, type = str)
+
+# if len(sys.argv)==1:
+#     parser.print_help(sys.stderr)
+#     sys.exit(0)
+
+# args = parser.parse_args()
+
+# ### old way, this API stopped working on 5-Aug-2022 ###
+# # link variables
+# base_genelab_url = "https://genelab-data.ndc.nasa.gov"
+# base_download_link = os.path.join(base_genelab_url, "genelab/static/media/dataset/")
+# GLDS_data_url = os.path.join(base_genelab_url, "genelab/data/study/data/", args.GLDS_ID)
+# filelistings_url_prefix = os.path.join(base_genelab_url, "genelab/data/study/filelistings/")
+# ###
+
+# ### new API way ###
+# GLDS_data_url = "https://visualization.genelab.nasa.gov/GLOpenAPI/samples/?id=" + str(args.GLDS_ID) + "&file.datatype&format=tsv"
+
+# # output table with files and links
+# output_file = args.GLDS_ID + "-files-and-links.tsv"
+
+# ################################################################################
+
+# def main():
+
+#     # making sure input fits format
+#     if not args.GLDS_ID.startswith("GLDS-"):
+
+#         report_message("The input --GLDS-ID argument needs to be in the format of 'GLDS-' followed by the appropriate GLDS number.")
+#         print("")
+#         exit(1)
 
 
-### functions ###
-def color_text(text, color='green'):
-    if sys.stdout.isatty():
-        return tty_colors[color] % text
-    else:
-        return text
+#     ### this was for the old way, the API for which broke on 5-Aug-2022 ###
+#     # # reading glds study data json in order to get the GeneLab ID
+#     # try:
+
+#     #     report_message("Retrieving " + args.GLDS_ID + " study data from:")
+#     #     print("    " + GLDS_data_url + "\n")
+
+#     #     with urlopen(GLDS_data_url) as json:
+
+#     #         glds_study_data_json = loads(json.read().decode())
+#     #         GL_hash_ID = glds_study_data_json[0]["_id"]
+
+#     # except:
+#     #     report_message(f"The input --GLDS-ID argument of {args.GLDS_ID} pointed us to the above address, but we couldn't find anything there :(")
+#     #     print("")
+#     #     exit(1)
+
+#     # filelistings_url = os.path.join(filelistings_url_prefix, GL_hash_ID)
+
+#     # report_message("Retrieving " + args.GLDS_ID + " files data from:")
+#     # print("    " + filelistings_url + "\n")
+
+#     # # reading fileslisting json
+#     # with urlopen(filelistings_url) as json:
+
+#     #     files_json = loads(json.read().decode())
 
 
-def wprint(text):
-    """ print wrapper """
+#     # with open(output_file, "w") as out_file:
 
-    print(textwrap.fill(text, width=80, initial_indent="  ",
-          subsequent_indent="  ", break_on_hyphens=False))
+#     #     # starting header
+#     #     out_file.write("filename\turl\n")
+
+#     #     for entry in files_json:
+
+#     #         filename = entry["file_name"]
+#     #         file_version = entry["version"]
+#     #         file_url = os.path.join(base_download_link, filename + "?version=" + str(file_version))
+
+#     #         out_file.write(f"{filename}\t{file_url}\n")
 
 
-def report_failure(message, color = "yellow"):
-    print("")
-    wprint(color_text(message, color))
-    print("\nData file info download failed.\n")
-    sys.exit(1)
+#     # report_message(f"Files and urls written to {output_file}", "green")
+#     # print(f"\n  Pass that file onto the `{color_text('GL-download-GLDS-data', 'yellow')}` program for downloading the data :)\n")
+
+#     ###
+
+#     # reading info table into pandas dataframe
+#     in_tab = pd.read_csv(GLDS_data_url, sep = "\t", comment = "#", names = ["accession", "assay_name", "sample_name", "datatype", "filename"])
+    
+#     # writing out table
+#     in_tab.to_csv(output_file, sep = "\t", index = False)
 
 
-def report_message(message, color = "yellow"):
-    print("")
-    wprint(color_text(message, color))
+# ################################################################################
 
-if __name__ == "__main__":
-    main()
+
+
+# # setting some colors
+# tty_colors = {
+#     'green' : '\033[0;32m%s\033[0m',
+#     'yellow' : '\033[0;33m%s\033[0m',
+#     'red' : '\033[0;31m%s\033[0m'
+# }
+
+
+# ### functions ###
+# def color_text(text, color='green'):
+#     if sys.stdout.isatty():
+#         return tty_colors[color] % text
+#     else:
+#         return text
+
+
+# def wprint(text):
+#     """ print wrapper """
+
+#     print(textwrap.fill(text, width=80, initial_indent="  ",
+#           subsequent_indent="  ", break_on_hyphens=False))
+
+
+# def report_failure(message, color = "yellow"):
+#     print("")
+#     wprint(color_text(message, color))
+#     print("\nData file info download failed.\n")
+#     sys.exit(1)
+
+
+# def report_message(message, color = "yellow"):
+#     print("")
+#     wprint(color_text(message, color))
+
+# if __name__ == "__main__":
+#     main()
