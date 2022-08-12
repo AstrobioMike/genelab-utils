@@ -11,7 +11,8 @@ import textwrap
 import pandas as pd
 from time import sleep
 import subprocess
-
+from json import loads
+from urllib.request import urlopen
 
 parser = argparse.ArgumentParser(description = "This is a program for downloading GLDS data files. For version info, run \
                                                 `GL-version`.")
@@ -35,6 +36,9 @@ parser.add_argument("-P", "--print-only", help = "Just print out the files that 
 parser.add_argument("-f", "--force", help = "Don't ask for confirmation to begin download (helpful if wanting to \
                                                   run non-interactively)", action = "store_true")
 
+parser.add_argument("--just-get-file-info-table", help = "Just download a table of all available files and their urls \
+                                                          (doesn't incorporate pattern searching)", action = "store_true") 
+
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -45,9 +49,9 @@ args = parser.parse_args()
 download_commands_file = str(args.GLDS_ID) + "-wanted-file-download-commands.sh"
 not_downloaded_files_file = "files-not-downloaded.txt"
 
-GLDS_data_url = "https://visualization.genelab.nasa.gov/GLOpenAPI/samples/?id=" + str(args.GLDS_ID) + "&file.datatype&format=tsv"
+GLDS_file_json_url = "https://genelab-data.ndc.nasa.gov/genelab/data/glds/files/" + str(args.GLDS_ID).removeprefix("GLDS-")
 
-base_file_url = "https://genelab-data.ndc.nasa.gov/geode-py/ws/studies/" + str(args.GLDS_ID) + "/download?file="
+base_file_url_prefix = "https://genelab-data.ndc.nasa.gov"
 
 GLDS_file_info_output_tab = args.GLDS_ID + "-file-info.tsv"
 
@@ -62,25 +66,26 @@ def main():
         print("")
         exit(1)
 
-    # reading GLDS file-info into dataframe
+    # getting GLDS file-info into table
     report_message("Retrieving " + args.GLDS_ID + " file data from:")
-    print("    " + GLDS_data_url + "\n")
+    print("    " + GLDS_file_json_url + "\n")
     
-    in_tab = pd.read_csv(GLDS_data_url, sep = "\t", comment = "#", names = ["accession", "assay_name", "sample_name", "datatype", "filename"])
+    gen_files_table(GLDS_file_json_url)
 
-    # writing out file-info table
-    in_tab.to_csv(GLDS_file_info_output_tab, sep = "\t", index = False)
-    report_message("This table with filenames and info has been written to:")
-    print("    " + GLDS_file_info_output_tab + "\n")
-    sleep(1)
+    # exiting if user just wants file-info table
+    if args.just_get_file_info_table:
+        exit()
 
-    # getting unique files
-    unique_files = in_tab.filename.unique()
-
+    # reading in file-info table
+    in_tab = pd.read_csv(GLDS_file_info_output_tab, sep = "\t")
+    
     # number of total files
-    num_total_files = len(unique_files)
+    num_total_files = len(in_tab.index)
+    
+    # list of all files
+    all_files = in_tab.filename.tolist()
 
-    report_message(f"The downloaded table holds a total of {num_total_files} unique files.")
+    report_message(f"The downloaded table holds a total of {num_total_files} files.")
     print("")
     sleep(1)
 
@@ -99,7 +104,7 @@ def main():
         target_files = []
         for pattern in patterns:
 
-            for file in unique_files:
+            for file in all_files:
 
                 if pattern in file:
 
@@ -126,7 +131,7 @@ def main():
 
     else:
         num_files_to_download = num_total_files
-        target_files = unique_files
+        target_files = all_files
 
     if args.print_only:
 
@@ -167,7 +172,9 @@ def main():
 
         for file in target_files:
 
-            download_script.write(f"{beginning_of_command} {file} {base_file_url}{file}\n")
+            target_url = in_tab.loc[in_tab['filename'] == file, 'url'].iloc[0]
+
+            download_script.write(f"{beginning_of_command} {file} '{target_url}'\n")
 
     report_message(f"Beginning download of the {num_files_to_download} file(s)...")
     print("")
@@ -242,6 +249,43 @@ def report_failure(message, color = "yellow"):
 def report_message(message, color = "yellow"):
     print("")
     wprint(color_text(message, color))
+
+
+def gen_files_table(files_info_url):
+
+    """
+    This function access the files info json from https://genelab-data.ndc.nasa.gov/genelab/data/glds/files/<GLDS_ID>
+    and creates a table with filenames and links
+    """
+
+    # reading fileslisting json
+    with urlopen(files_info_url) as json:
+
+        files_json = loads(json.read().decode())
+
+    files_dict = files_json["studies"][args.GLDS_ID]["study_files"]
+
+    # writing out table with filenames and their urls
+
+    with open(GLDS_file_info_output_tab, "w") as out_file:
+
+        # starting header
+        out_file.write("filename\turl\n")
+
+        for entry in files_dict:
+
+            filename = entry["file_name"]
+            
+            file_url = os.path.join(base_file_url_prefix, entry["remote_url"].lstrip("/"))
+
+            out_file.write(f"{filename}\t{file_url}\n")
+
+    # writing out file-info table
+    report_message("A table with available filenames and urls has been written to:")
+    print("    " + GLDS_file_info_output_tab + "\n")
+    sleep(1)
+
+
 
 if __name__ == "__main__":
     main()
