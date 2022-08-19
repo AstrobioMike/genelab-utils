@@ -25,8 +25,8 @@ required.add_argument("-p", "--pattern", help = "If we do not want to download a
                       a pattern here to subset the total files. For example, if we know we want to download just the fastq.gz \
                       files, we can say '-p fastq.gz'. We can also provide multiple patterns as a comma-separated list. For example, \
                       If we want to download the fastq.gz files that also have 'NxtaFlex', 'metagenomics', and 'raw' in their filenames, we can provide \
-                      '-p fastq.gz,NxtaFlex,metagenomics,raw'. Looking through the table produced by the `GL-get-GLDS-files-info` program \
-                      can help figure this out if needed. (Note that this is case-sensitive.)", action = "store", type = str)
+                      '-p fastq.gz,NxtaFlex,metagenomics,raw'. Looking through the *-file-info.tsv table produced by this program when run \
+                      with the '--just-get-file-info-table' flag can help figure this out if needed. (Note that this is case-sensitive.)", action = "store", type = str)
 
 parser.add_argument("-j", "--jobs", help = "Number of downloads to run in parallel (default: 10)", default = 10, action = "store", type = int)
 
