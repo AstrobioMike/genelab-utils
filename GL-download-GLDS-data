@@ -102,11 +102,10 @@ def main():
 
         # starting empty list of target files that hold the searched patterns
         target_files = []
-        for pattern in patterns:
 
-            for file in all_files:
+        for file in all_files:
 
-                if pattern in file:
+            if all(pattern in file for pattern in patterns):
 
                     target_files.append(file)
 
