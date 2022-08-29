@@ -15,7 +15,7 @@ from io import BytesIO
 import re
 
 parser = argparse.ArgumentParser(description = "This is a helper program for downloading GeneLab workflows. For verison info run `GL-version`.",
-                                 epilog="Ex. usage: GL-get-workflow MG-illumina\n")
+                                 epilog="Ex. usage: GL-get-workflow MG-Illumina\n")
 
 required = parser.add_argument_group('required arguments')
 
