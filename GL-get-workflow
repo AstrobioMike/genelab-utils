@@ -1,0 +1,204 @@
+#!/usr/bin/env python
+
+"""
+This is a program for downloading the files required to utilize a GeneLab workflow.
+"""
+
+import sys
+import os
+import argparse
+import textwrap
+import requests
+from requests_html import HTMLSession
+import zipfile
+from io import BytesIO
+import re
+
+parser = argparse.ArgumentParser(description = "This is a helper program for downloading GeneLab workflows. For verison info run `GL-version`.",
+                                 epilog="Ex. usage: GL-get-workflow MG-illumina\n")
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument('workflow', choices = ['MG-Illumina', 
+                                           'MG-remove-human-reads', 
+                                           'MG-estimate-host-reads',
+                                           'Amplicon-Illumina',
+                                           'Amplicon-454-IonTorrent',
+                                           'RNAseq'], 
+                                           help = "The first positional argument should be which one of these workflows you'd like to download")
+
+parser.add_argument("--wanted-version", help = "Specify the version you'd like to download (leaving out this argument will pull the latest by default)")
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+
+### variables we'd likely want to adjust first ###
+
+base_repo = "https://github.com/asaravia-butler/GeneLab_Data_Processing/"
+# base_repo = "https://github.com/nasa/GeneLab_Data_Processing/"
+
+base_download_link = base_repo + "releases/download/"
+releases_page_link = base_repo + "releases"
+
+# core workflow info
+workflow_dict = {
+
+    "MG-Illumina": { "basename": "SW_MGIllumina", "latest_version": "1.0.0"},
+    "MG-remove-human-reads": { "basename": "SW_MGRemoveHumanReads-A", "latest_version": "1.0.0"},
+    "MG-estimate-host-reads": { "basename": "SW_MGEstHostReads", "latest_version": "1.0.0"},
+    "Amplicon-Illumina": { "basename": "SW_AmpIllumina-A", "latest_version": "1.0.0"},
+    "Amplicon-454-IonTorrent": { "basename": "SW_Amp454IonTor", "latest_version": "1.0.0"},
+    "RNAseq": { "basename": "NF_RCP-F", "latest_version": "1.0.0"},
+
+}
+
+
+################################################################################
+
+def main():
+
+    dl_wf(args.workflow)
+
+################################################################################
+
+### variables and functions ###
+
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def report_message(message, color = "yellow"):
+    print("")
+    wprint(color_text(message, color))
+
+
+def get_versions_available(target_wf) -> list:
+
+    """ this finds which versions are available on the release page and returns them as a list """
+
+    # accessing release page
+    release_page = HTMLSession().get(releases_page_link)
+
+    # getting all links available on that page
+    links = release_page.html.absolute_links
+    
+    # starting empty list of available versions
+    available_versions = []
+
+    for link in links:
+
+        # getting just those for the requested workflow
+        if re.search(target_wf, link):
+
+            # getting just those that hold a release zip
+            if re.search("releases/download", link) and re.search(".zip", link):
+
+                # cutting out just the version info
+                link_basename = os.path.basename(link)
+                link_version = link_basename.replace(target_wf + "_", "").replace(".zip", "")
+                
+                # adding to list
+                available_versions.append(link_version)
+
+
+    return(available_versions)
+
+
+def check_version_available(wanted_version, available_versions):
+
+    """ this checks if the requested version was found on the releases page """
+
+    if wanted_version not in available_versions:
+
+        report_message(f"The requested version, {wanted_version}, is not available.")
+        print(f"\n    Those available for the {args.workflow} workflow include:\n")
+
+        for version in available_versions:
+
+            print(f"        {version}")
+
+        print("\n  Exiting for now.\n")
+        exit(1)
+
+
+def check_if_dir_already_exists(dir_name):
+
+    """ this checks if the output directory already exists, so as to not overwrite anything """
+
+    if os.path.exists(dir_name):
+
+        report_message(f"The output directory '{dir_name}/' already exists and we don't want to overwrite anything.")
+        print("\n    Please rename or remove it first.")
+        print("\n  Exiting for now.\n")
+        exit(1)
+        
+
+def download_and_unzip(target_link):
+
+    """ this downloads and unzips the target workflow """
+
+    # downloading
+    target = requests.get(target_link)
+
+    # extracting zip
+    zip = zipfile.ZipFile(BytesIO(target.content))
+    zip.extractall()
+
+    downloaded_basename = os.path.basename(target_link).replace(".zip", "")
+
+    report_message(f"The {args.workflow} workflow was downloaded to '{downloaded_basename}/'", "green")
+
+    print(f"\n    It was pulled from this release page:\n         {releases_page_link}\n")
+
+
+def dl_wf(target_wf):
+
+    """ main download function """
+
+    # getting the specific filename/directory name for the requested workflow (e.g. "MG-Illumina" is "SW_MGIllumina")
+    basename = workflow_dict[args.workflow]["basename"]
+
+    # getting which versions are available for download
+    available_versions = get_versions_available(basename)
+
+    if args.wanted_version:
+
+        # checking specified version exists and exiting if not
+        check_version_available(args.wanted_version, available_versions)
+
+        full_target_name = basename + "_" + args.wanted_version
+
+    else:
+
+        full_target_name = basename + "_" + workflow_dict[args.workflow]["latest_version"]
+
+    # building full download link
+    full_link = base_download_link + full_target_name + "/" + full_target_name + ".zip"
+
+    # checking if output directory exists already, and exiting if yes
+    check_if_dir_already_exists(full_target_name)
+
+    download_and_unzip(full_link)
+
+################################################################################
+
+if __name__ == "__main__":
+    main()

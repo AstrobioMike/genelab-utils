@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 
-if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-    printf "\n  Currently pulls Illumina metagenomics workflow from:\n"
-    printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Illumina\n\n"
-    printf "  For version info run \`GL-version\`.\n\n"
-    exit
-fi
+printf "\n  This script has been deprecated, please see \`GL-get-workflow\`.\n\n"
+exit
 
-curl -sLO https://github.com/asaravia-butler/GeneLab_Data_Processing/archive/refs/heads/mikes-branch.zip
+# if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+#     printf "\n  Currently pulls Illumina metagenomics workflow from:\n"
+#     printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Illumina\n\n"
+#     printf "  For version info run \`GL-version\`.\n\n"
+#     exit
+# fi
 
-unzip -qq mikes-branch.zip "GeneLab_Data_Processing-mikes-branch/Metagenomics/Illumina/workflow-template/*"
+# curl -sLO https://github.com/asaravia-butler/GeneLab_Data_Processing/archive/refs/heads/mikes-branch.zip
 
-mv GeneLab_Data_Processing-mikes-branch/Metagenomics/Illumina/workflow-template/ Illumina-metagenomics-workflow
+# unzip -qq mikes-branch.zip "GeneLab_Data_Processing-mikes-branch/Metagenomics/Illumina/workflow-template/*"
 
-rm -rf GeneLab_Data_Processing-mikes-branch/ mikes-branch.zip
+# mv GeneLab_Data_Processing-mikes-branch/Metagenomics/Illumina/workflow-template/ Illumina-metagenomics-workflow
 
-printf "\n  Pulled Illumina metagenomic workflow from:\n"
-printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Illumina\n\n"
+# rm -rf GeneLab_Data_Processing-mikes-branch/ mikes-branch.zip
+
+# printf "\n  Pulled Illumina metagenomic workflow from:\n"
+# printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Illumina\n\n"

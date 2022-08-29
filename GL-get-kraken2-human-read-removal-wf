@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 
-if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-    printf "\n  Currently pulls kraken2 human-read removal workflow from:\n"
-    printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Remove_human_reads_from_raw_data\n"
-    printf "\n  For version info run \`GL-version\`.\n\n"
-    exit
-fi
+printf "\n  This script has been deprecated, please see \`GL-get-workflow\`.\n\n"
+exit
 
-curl -sLO https://github.com/asaravia-butler/GeneLab_Data_Processing/archive/refs/heads/mikes-branch.zip
+# if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+#     printf "\n  Currently pulls kraken2 human-read removal workflow from:\n"
+#     printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Remove_human_reads_from_raw_data\n"
+#     printf "\n  For version info run \`GL-version\`.\n\n"
+#     exit
+# fi
 
-unzip -qq mikes-branch.zip "GeneLab_Data_Processing-mikes-branch/Metagenomics/Remove_human_reads_from_raw_data/workflow-template/*"
+# curl -sLO https://github.com/asaravia-butler/GeneLab_Data_Processing/archive/refs/heads/mikes-branch.zip
 
-mv GeneLab_Data_Processing-mikes-branch/Metagenomics/Remove_human_reads_from_raw_data/workflow-template/ remove-human-reads-workflow
+# unzip -qq mikes-branch.zip "GeneLab_Data_Processing-mikes-branch/Metagenomics/Remove_human_reads_from_raw_data/workflow-template/*"
 
-rm -rf GeneLab_Data_Processing-mikes-branch/ mikes-branch.zip
+# mv GeneLab_Data_Processing-mikes-branch/Metagenomics/Remove_human_reads_from_raw_data/workflow-template/ remove-human-reads-workflow
 
-printf "\n  Pulled kraken2 human-read removal workflow from:\n"
-printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Remove_human_reads_from_raw_data\n\n"
+# rm -rf GeneLab_Data_Processing-mikes-branch/ mikes-branch.zip
 
-printf "  Unless changed in the 'config.yaml' file, that workflow will download and utilize the kraken2\n"
-printf "      human reference database built as described here:\n"
-printf "      https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/mikes-branch/Metagenomics/Remove_human_reads_from_raw_data/reference-database-info.md\n\n"
+# printf "\n  Pulled kraken2 human-read removal workflow from:\n"
+# printf "      github.com/asaravia-butler/GeneLab_Data_Processing/tree/mikes-branch/Metagenomics/Remove_human_reads_from_raw_data\n\n"
+
+# printf "  Unless changed in the 'config.yaml' file, that workflow will download and utilize the kraken2\n"
+# printf "      human reference database built as described here:\n"
+# printf "      https://github.com/asaravia-butler/GeneLab_Data_Processing/blob/mikes-branch/Metagenomics/Remove_human_reads_from_raw_data/reference-database-info.md\n\n"
