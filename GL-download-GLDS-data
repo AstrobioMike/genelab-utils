@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This is a program for downloading GLDS data files.
+This is a helper program for downloading GLDS data files.
 """
 
 import os
@@ -55,7 +55,7 @@ if len(sys.argv)==1:
 args = parser.parse_args()
 
 download_commands_file = str(args.GLDS_ID) + "-wanted-file-download-commands.sh"
-not_downloaded_files_file = "files-not-downloaded.txt"
+not_downloaded_files_file = str(args.GLDS_ID) + "-files-targeted-but-not-downloaded.txt"
 
 GLDS_file_json_url = "https://genelab-data.ndc.nasa.gov/genelab/data/glds/files/" + str(args.GLDS_ID).removeprefix("GLDS-")
 
@@ -181,7 +181,7 @@ def gen_files_table(files_info_url):
             out_file.write(f"{filename}\t{file_url}\n")
 
     # writing out file-info table
-    report_message("A table with available filenames and urls has been written to:")
+    report_message("A table with available filenames and URLs has been written to:")
     print("    " + GLDS_file_info_output_tab + "\n")
     sleep(1)
 
@@ -313,7 +313,7 @@ def download(target_files, in_tab, num_files_to_download):
     for block in split_download_commands_list:
 
         # writing to tempfile for passing to curl/parallel
-        curr_temp_file = tempfile.NamedTemporaryFile(dir = "./")
+        curr_temp_file = tempfile.NamedTemporaryFile()
         
         with open(curr_temp_file.name, mode = "w", encoding = "utf-8") as curr_dl_file:
 
