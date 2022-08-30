@@ -13,6 +13,7 @@ from time import sleep
 import subprocess
 from json import loads
 from urllib.request import urlopen
+import tempfile
 
 parser = argparse.ArgumentParser(description = "This is a program for downloading GLDS data files. For version info, run \
                                                 `GL-version`.")
@@ -36,8 +37,15 @@ parser.add_argument("-P", "--print-only", help = "Just print out the files that 
 parser.add_argument("-f", "--force", help = "Don't ask for confirmation to begin download (helpful if wanting to \
                                                   run non-interactively)", action = "store_true")
 
-parser.add_argument("--just-get-file-info-table", help = "Just download a table of all available files and their urls \
+parser.add_argument("--just-get-file-info-table", help = "Just download a table of all available files and their URLs \
                                                           (doesn't incorporate pattern searching)", action = "store_true") 
+
+parser.add_argument("-m", "--mode", choices = {"exclusive", "additive"}, help = "If providing multiple patterns to the `-p` argument, \
+                    this option determines how to handle them. For example, if we provide `-p raw,fastq`, in the default \
+                    mode of 'exclusive', we will only grab files that have *both* 'raw' and 'fastq' in their filenames. If we set \
+                    `-m additive`, we would get all files that have *either* 'raw' or ' fastq' in their filenames. (default: exclusive)", 
+                    default = "exclusive", action = "store", type = str)
+
 
 
 if len(sys.argv)==1:
@@ -89,129 +97,22 @@ def main():
     print("")
     sleep(1)
 
-    if args.pattern:
-
-        # splitting if any commas
-        if "," in args.pattern:
-
-            patterns = args.pattern.split(",")
-
-        else:
-
-            patterns = [args.pattern]
-
-        # starting empty list of target files that hold the searched patterns
-        target_files = []
-
-        for file in all_files:
-
-            if all(pattern in file for pattern in patterns):
-
-                    target_files.append(file)
-
-        # getting rid of any duplicates
-        target_files = set(target_files)
-        target_files = list(target_files)
-
-        # number of files after filtering
-        num_files_to_download = len(target_files)
-        
-        if num_files_to_download == 0:
-
-            report_message(f"No files were found matching the specified pattern(s) :(")
-            report_message(f"Maybe look into the '{GLDS_file_info_output_tab}' file to see what's there.")
-            report_message(f"(Also note that the pattern-matching done here is case-sensitive.)")
-            print("")
-            exit(0)
-
-        report_message(f"{num_files_to_download} file(s) found matching the provided pattern(s).")
-        print("")
-        sleep(1)
-
-    else:
-        num_files_to_download = num_total_files
-        target_files = all_files
+    # getting targets
+    target_files, num_files_to_download = get_targets(all_files, num_total_files)
 
     if args.print_only:
 
-        report_message(f"As requested, here are the {num_files_to_download} files that would be downloaded by this command if run without the '--print-only' flag:")
-        print()
-        sleep(2.5)
-
-        for filename in target_files:
-            print(f"    {filename}")
-            sleep(0.01)
-
-        print("")
-        exit(0)
+        print_target_files(target_files, num_files_to_download)
 
     if not args.force:
 
-        report_message(f"If you'd just like to see a list of the files that would be downloaded, here is your chance to exit and rerun the command with the '--print-only' flag...")
-        sleep(1)
-        print("")
+        confirm_download(num_files_to_download)
 
-        print(f"    Enter 'y' if you'd like to begin downloading these {num_files_to_download} files,")
-        response = input("    enter any other key to exit without downloading: ")
+    # building and performing download
+    download(target_files, in_tab, num_files_to_download)
 
-        if response != "y":
-
-            report_message(f"Exiting without downloading :)")
-            print("")
-            exit(0)
-
-        else:
-
-            print("")
-
-    # building download script based on curl
-    beginning_of_command = "curl -L -s -o"
-
-    with open(download_commands_file, "w") as download_script:
-
-        for file in target_files:
-
-            target_url = in_tab.loc[in_tab['filename'] == file, 'url'].iloc[0]
-
-            download_script.write(f"{beginning_of_command} {file} '{target_url}'\n")
-
-    report_message(f"Beginning download of the {num_files_to_download} file(s)...")
-    print("")
-
-    dl_command = f"parallel --xapply -j {args.jobs} < {download_commands_file}"
-
-    subprocess.run(dl_command, shell = True)
-    
     # checking expected files were downloaded
-    cwd_files = os.listdir(".")
-
-    missing_files = []
-
-    for file in target_files:
-
-        if file not in cwd_files:
-
-            missing_files.append(file)
-
-    num_missing = len(missing_files)
-
-    if num_missing > 0:
-
-        with open(not_downloaded_files_file, "w") as out_file:
-            for file in missing_files:
-                out_file.write(f"{file}\n")
-
-        report_message(f"Some files ({num_missing}) weren't successfully downloaded for some reason. They have been written to:")
-        print(f"    {not_downloaded_files_file}\n")
-
-    else:
-
-        report_message(f"All {num_files_to_download} files have been downloaded :)", "green")
-        print("")
-
-    report_message(f"The download commands executed were written to:")
-    print(f"    {download_commands_file}\n")
-
+    check_expected_files_were_downloaded(target_files, num_files_to_download)
 
 ################################################################################
 
@@ -284,6 +185,191 @@ def gen_files_table(files_info_url):
     print("    " + GLDS_file_info_output_tab + "\n")
     sleep(1)
 
+
+def check_expected_files_were_downloaded(target_files, num_files_to_download):
+
+    """ this function checks the expected were downloaded """
+
+    cwd_files = os.listdir(".")
+
+    missing_files = []
+
+    for file in target_files:
+
+        if file not in cwd_files:
+
+            missing_files.append(file)
+
+    num_missing = len(missing_files)
+
+    if num_missing > 0:
+
+        with open(not_downloaded_files_file, "w") as out_file:
+            for file in missing_files:
+                out_file.write(f"{file}\n")
+
+        report_message(f"Some files ({num_missing}) weren't successfully downloaded for some reason. They have been written to:")
+        print(f"    {not_downloaded_files_file}\n")
+
+    else:
+
+        report_message(f"All {num_files_to_download} files have been successfully downloaded :)", "green")
+        print("")
+
+    report_message(f"The download commands executed were written to:")
+    print(f"    {download_commands_file}\n")
+
+
+def get_targets(all_files, num_total_files):
+
+    if args.pattern:
+
+        # splitting if any commas
+        if "," in args.pattern:
+
+            patterns = args.pattern.split(",")
+
+        else:
+
+            patterns = [args.pattern]
+
+        # starting empty list of target files that hold the searched patterns
+        target_files = []
+
+        for file in all_files:
+
+            # dealing with if mode is exclusive or additive (see help)
+            if args.mode == "exclusive":
+
+                if all(pattern in file for pattern in patterns):
+
+                    target_files.append(file)
+
+            else:
+
+                if any(pattern in file for pattern in patterns):
+
+                    target_files.append(file)
+
+
+        # getting rid of any duplicates
+        target_files = set(target_files)
+        target_files = list(target_files)
+
+        # number of files after filtering
+        num_files_to_download = len(target_files)
+        
+        if num_files_to_download == 0:
+
+            report_message(f"No files were found matching the specified pattern(s) :(")
+            report_message(f"Maybe look into the '{GLDS_file_info_output_tab}' file to see what's there.")
+            report_message(f"(Also note that the pattern-matching done here is case-sensitive.)")
+            print("")
+            exit(0)
+
+        report_message(f"{num_files_to_download} file(s) found matching the provided pattern(s).")
+        print("")
+        sleep(1)
+
+    else:
+        num_files_to_download = num_total_files
+        target_files = all_files
+
+    return(target_files, num_files_to_download)
+
+
+def download(target_files, in_tab, num_files_to_download):
+
+    """ this function prepares and performed the download with curl/parallel in subprocesses """
+
+    # building download script based on curl
+    beginning_of_command = "curl -L -s -o"
+
+    # putting commands into list also
+    download_commands_list = []
+
+    with open(download_commands_file, "w") as download_script:
+
+        for file in target_files:
+
+            target_url = in_tab.loc[in_tab['filename'] == file, 'url'].iloc[0]
+
+            download_script.write(f"{beginning_of_command} {file} '{target_url}'\n")
+
+            download_commands_list.append(f"{beginning_of_command} {file} '{target_url}'")
+
+
+    report_message(f"Beginning download of the {num_files_to_download} file(s)...")
+    print("")
+
+    ## splitting into chunks the size of jobs, so can update at least somewhat during the download
+    split_download_commands_list = [download_commands_list[command:command + args.jobs] for command in range(0, len(download_commands_list), args.jobs)]
+    
+    ## downloading and reporting for each block
+    # counter for files downloaded
+    files_processed = 0
+    print(f"    Files processed: {files_processed} out of {num_files_to_download} target(s)...", end = '\r')
+
+    for block in split_download_commands_list:
+
+        # writing to tempfile for passing to curl/parallel
+        curr_temp_file = tempfile.NamedTemporaryFile(dir = "./")
+        
+        with open(curr_temp_file.name, mode = "w", encoding = "utf-8") as curr_dl_file:
+
+            curr_dl_file.write("\n".join(block))
+            curr_dl_file.write("\n")
+
+        # downloading this block
+        dl_command = f"parallel --xapply -j {args.jobs} < {curr_temp_file.name}"
+        subprocess.run(dl_command, shell = True)
+
+        # incrementing file counter
+        files_processed += len(block)
+
+        # reporting 
+        if files_processed != num_files_to_download:
+
+            print(f"    Files processed: {files_processed} out of {num_files_to_download} target(s)...", end = '\r')
+
+        else:
+            print(f"    Files processed: {files_processed} out of {num_files_to_download} target(s)...", end = '\r')
+            print("\n")
+            sleep(1.5)
+
+
+def print_target_files(target_files, num_files_to_download):
+
+        report_message(f"As requested, here are the {num_files_to_download} files that would be downloaded by this command if run without the '--print-only' flag:")
+        print()
+        sleep(2.5)
+
+        for filename in target_files:
+            print(f"    {filename}")
+            sleep(0.01)
+
+        print("")
+        exit(0)
+
+
+def confirm_download(num_files_to_download):
+
+        report_message(f"If you'd just like to see a list of the file(s) that would be downloaded, here is your chance to exit and rerun the command with the '--print-only' flag...")
+        sleep(1)
+        print("")
+
+        print(f"    Enter 'y' if you'd like to begin downloading {num_files_to_download} file(s),")
+        response = input("    enter any other key to exit without downloading: ")
+
+        if response != "y":
+
+            report_message(f"Exiting without downloading :)")
+            print("")
+            exit(0)
+
+        else:
+
+            print("")
 
 
 if __name__ == "__main__":
