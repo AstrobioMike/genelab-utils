@@ -13,6 +13,7 @@ from requests_html import HTMLSession
 import zipfile
 from io import BytesIO
 import re
+from packaging import version
 
 parser = argparse.ArgumentParser(description = "This is a helper program for downloading GeneLab workflows. For verison info run `GL-version`.",
                                  epilog="Ex. usage: GL-get-workflow MG-Illumina\n")
@@ -47,12 +48,12 @@ releases_page_link = base_repo + "releases"
 # core workflow info
 workflow_dict = {
 
-    "MG-Illumina": { "basename": "SW_MGIllumina", "latest_version": "1.0.0"},
-    "MG-remove-human-reads": { "basename": "SW_MGRemoveHumanReads-A", "latest_version": "1.0.0"},
-    "MG-estimate-host-reads": { "basename": "SW_MGEstHostReads", "latest_version": "1.0.0"},
-    "Amplicon-Illumina": { "basename": "SW_AmpIllumina-A", "latest_version": "1.0.0"},
-    "Amplicon-454-IonTorrent": { "basename": "SW_Amp454IonTor", "latest_version": "1.0.0"},
-    "RNAseq": { "basename": "NF_RCP-F", "latest_version": "1.0.0"},
+    "MG-Illumina": { "basename": "SW_MGIllumina" },
+    "MG-remove-human-reads": { "basename": "SW_MGRemoveHumanReads-A" },
+    "MG-estimate-host-reads": { "basename": "SW_MGEstHostReads" },
+    "Amplicon-Illumina": { "basename": "SW_AmpIllumina-A" },
+    "Amplicon-454-IonTorrent": { "basename": "SW_Amp454IonTor" },
+    "RNAseq": { "basename": "NF_RCP-F" }
 
 }
 
@@ -118,7 +119,6 @@ def get_versions_available(target_wf) -> list:
                 # adding to list
                 available_versions.append(link_version)
 
-
     return(available_versions)
 
 
@@ -179,6 +179,9 @@ def dl_wf(target_wf):
     # getting which versions are available for download
     available_versions = get_versions_available(basename)
 
+    # sorting (so we can grab the latest if needed)
+    available_versions = sorted(available_versions, key = lambda x: version.Version(x), reverse = True)
+
     if args.wanted_version:
 
         # checking specified version exists and exiting if not
@@ -188,7 +191,7 @@ def dl_wf(target_wf):
 
     else:
 
-        full_target_name = basename + "_" + workflow_dict[args.workflow]["latest_version"]
+        full_target_name = basename + "_" + available_versions[0]
 
     # building full download link
     full_link = base_download_link + full_target_name + "/" + full_target_name + ".zip"
