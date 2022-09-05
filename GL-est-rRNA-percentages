@@ -16,15 +16,15 @@ parser = argparse.ArgumentParser(description = "This is currently just an intern
                                                 It is not currently written to work properly anywhere other than GeneLab's main cluster, and is not robust to \
                                                 things like varying file extensions (it is expected to have files already renamed in GL's convention). \
                                                 For help reach out to Mike. For version info, run `GL-version`.",
-                                 epilog="Ex. usage: GL-est-rRNA-percentages Mus-musculus\n")
+                                 epilog="Ex. usage: GL-est-rRNA-percentages -s samplex.txt --ref Mus-musculus --slurm\n")
 
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store", required = True)
 
-required.add_argument('--ref', help = "The primary target organism/clade", 
-                      action = "store", required = True, choices = ['Mus-musculus', 
-                                                                    'H-sapiens', 
+required.add_argument('--ref', help = "The primary target organism/clade",
+                      action = "store", required = True, choices = ['Mus-musculus',
+                                                                    'H-sapiens',
                                                                     'D-melanogaster',
                                                                     'A-thaliana',
                                                                     'B-distachyon',
@@ -78,7 +78,7 @@ def main():
 
     # checking input files exist and are found
     checking_inputs()
-    
+
     # checking snakemake slurm profile exists
     check_for_snakemake_slurm_profile()
 
@@ -115,7 +115,7 @@ def color_text(text, color='green'):
 
 
 def wprint(text):
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
+    print(textwrap.fill(text, width=80, initial_indent="  ",
           subsequent_indent="  ", break_on_hyphens=False))
 
 
@@ -131,14 +131,14 @@ def exit_message():
 
 def check_for_refs(expected_reference_dict):
 
-    """ 
-    this checks if the expected system variable is set and if it is a directory 
+    """
+    this checks if the expected system variable is set and if it is a directory
     holding the expected reference files
     """
 
     # making sure variable is set
     try:
-    
+
         ref_dir = os.environ['rRNA_refs']
 
     except:
@@ -208,7 +208,7 @@ def checking_inputs():
         for file in all_input_files:
 
             file = os.path.basename(file)
-            
+
             if file.endswith("_R1_raw.fastq.gz"):
 
                 detected_unique_filenames.append(file.replace("_R1_raw.fastq.gz", ""))
@@ -231,7 +231,7 @@ def checking_inputs():
         for file in all_input_files:
 
             file = os.path.basename(file)
-            
+
             detected_unique_filenames.append(file.replace("_raw.fastq.gz", ""))
 
 
@@ -249,7 +249,7 @@ def check_for_snakemake_slurm_profile():
     """ this just makes sure the file exists where expected, will fail """
 
     if args.slurm:
-    
+
         expected_snakemake_slurm_profile_path = os.path.join(os.path.expanduser('~'), ".config/snakemake/est-rRNA-slurm/config.yaml")
 
         if not os.path.exists(expected_snakemake_slurm_profile_path):
@@ -279,7 +279,8 @@ def build_snakemake_call():
                       f"primary_target_ref_filename={primary_target_ref_filename}",
                       f"ref_dir='{ref_dir}'",
                       f"GLDS_ID={GLDS_ID}",
-                      f"single_ended={single_ended}"]
+                      f"single_ended={single_ended}",
+                      f"logs_dir=hts_SeqScreener_logs"]
 
 
     # pointing to slurm profile for this if '--slurm' was specified
@@ -302,7 +303,7 @@ def build_snakemake_call():
 def execute_snakemake_wf(snakemake_call):
 
     if not args.slurm:
-    
+
         # running it straight if called without the `--slurm` option
         report_message("Executing Snakemake workflow:", "green")
         print("")
@@ -312,7 +313,7 @@ def execute_snakemake_wf(snakemake_call):
 
         # running it in the background and exiting if called with `--slurm`
         report_message("The snakemake workflow has been executed through slurm.", "green")
-        print("\n    You can check it's progress in slurm with `squeue`, and the log is being written to 'snakemake.log'.")
+        print("\n    You can check its progress in slurm with `squeue`, and the log is being written to 'snakemake.log'.")
         print(f"    When it's finished, '{args.GLDS_ID}-estimated-rRNA-percentages.tsv' will be the primary output file.\n")
 
         with open("snakemake.log", "w") as log_file:
@@ -322,9 +323,8 @@ def execute_snakemake_wf(snakemake_call):
 
 def write_blurb():
 
-    # getting version of htstream
-    htstream_version = subprocess.run(['hts_SeqScreener', '-v', '|', 'grep', '"htstream"', "|", "tr", "-s", " ", "\t", "|", "cut", "-f", "2"], stdout = subprocess.PIPE).stdout.decode('utf-8').strip()
-
+    # getting version of htstream (the programs all give 1.3.2, but the installed conda version is 1.3.3, so getting that with this mess)
+    htstream_version = subprocess.check_output('conda list | grep htstream | tr -s " " "\t" | cut -f 2', shell = True).decode('utf-8').strip()
     # writing out versions used to file
     with open(blurb_file, "w") as out_file:
 
@@ -360,7 +360,7 @@ sample_ID_list = [line.strip() for line in open(config["sample_IDs_file"])]
 ref_dir = config["ref_dir"]
 primary_target_ref_filename = config["primary_target_ref_filename"]
 primary_target_ref_path = os.path.join(ref_dir, primary_target_ref_filename)
-
+logs_dir = config["logs_dir"]
 
 
 ########################################
@@ -379,7 +379,7 @@ if config["single_ended"] != True:
             R2 = config["input_reads_dir"] + "{ID}_R2_raw.fastq.gz"
 
         output:
-            json_log = "{ID}-rRNA-screen.log"
+            json_log = logs_dir + "/{ID}-rRNA-screen.log"
 
         shell:
             """
@@ -399,7 +399,7 @@ else:
             reads = config["input_reads_dir"] + "{ID}_raw.fastq.gz"
 
         output:
-            json_log = "{ID}-rRNA-screen.log"
+            json_log = logs_dir + "/{ID}-rRNA-screen.log"
 
         shell:
             """
@@ -416,7 +416,7 @@ else:
 
 rule combine_outputs:
     input:
-        expand("{ID}-rRNA-screen.log", ID = sample_ID_list)
+        expand(logs_dir + "/{ID}-rRNA-screen.log", ID = sample_ID_list)
 
     output:
         out_file = config["GLDS_ID"] + "-estimated-rRNA-percentages.tsv"
@@ -433,14 +433,14 @@ rule combine_outputs:
 
 def make_tables(list_of_files):
 
-    """ 
+    """
     this takes a list of input paths to the json log files, parses them and calculates percentages of hits
     """
 
     # starting empty list of rows we combine at end
     list_of_rows = []
 
-    for input_file in list_of_files: 
+    for input_file in list_of_files:
 
         # reading in json log file
         with open(input_file) as json_file:
@@ -448,7 +448,7 @@ def make_tables(list_of_files):
             log_json = json.load(json_file)
 
         # getting sample ID
-        sample_name = log_json[0]["Program_details"]["options"]["stats-file"].replace("-rRNA-screen.log", "")
+        sample_name = log_json[0]["Program_details"]["options"]["stats-file"].replace("-rRNA-screen.log", "").replace(logs_dir, "").replace("/", "")
 
         # getting number of reads in sample
         num_sample_total_reads = log_json[0]["Fragment"]["in"]
@@ -458,7 +458,7 @@ def make_tables(list_of_files):
 
         # getting the hits to each target ref
         for element in log_json:
-            
+
             # getting target ref
             if element["Program_details"]["options"].get("seq") is not None:
 
