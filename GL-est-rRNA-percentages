@@ -64,8 +64,8 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
                            "R-norvegicus": "rrna-Rnorvegicus.fasta",
                            "Streptococcus": "rrna-Streptococcus.fasta"}
 
-
-
+data_of_rRNA_refs_fetched = "01-Sep-2021"
+blurb_file = str(args.GLDS_ID) + "-estimate-rRNA-blurb.txt"
 
 ################################################################################
 
@@ -92,6 +92,9 @@ def main():
 
     # execute snakemake workflow
     execute_snakemake_wf(snakemake_call)
+
+    # write blurb of version used
+    write_blurb()
 
 ################################################################################
 
@@ -315,6 +318,20 @@ def execute_snakemake_wf(snakemake_call):
         with open("snakemake.log", "w") as log_file:
 
             subprocess.Popen(snakemake_call, stdout = log_file, stderr = log_file)
+
+
+def write_blurb():
+
+    # getting version of htstream
+    htstream_version = subprocess.run(['hts_SeqScreener', '-v', '|', 'grep', '"htstream"', "|", "tr", "-s", " ", "\t", "|", "cut", "-f", "2"], stdout = subprocess.PIPE).stdout.decode('utf-8').strip()
+
+    # writing out versions used to file
+    with open(blurb_file, "w") as out_file:
+
+        out_file.write(f"htstream v{htstream_version} utilized\n")
+
+        out_file.write("\nProtocol text:\n\n")
+        out_file.write(f"rRNA percentages of reads were estimated with the 'hts_SeqScreener' program of htstream v{htstream_version} screened against a fasta file of {args.ref} rRNA sequences retrieved from NCBI on {data_of_rRNA_refs_fetched}.\n\n")
 
 
 def write_snakefile(snakefile_text):
