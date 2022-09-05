@@ -1,0 +1,488 @@
+#!/usr/bin/env python
+
+"""
+This is an internal genelab program for estimating percentages of rRNA in RNAseq datasets.
+"""
+
+import os
+import sys
+import argparse
+import textwrap
+import glob
+import subprocess
+
+parser = argparse.ArgumentParser(description = "This is currently just an internal GeneLab program helper program for estimating percentages \
+                                                of rRNA reads for a few organisms in fastq files. It screens against a primary organism and a few others. \
+                                                It is not currently written to work properly anywhere other than GeneLab's main cluster, and is not robust to \
+                                                things like varying file extensions (it is expected to have files already renamed in GL's convention). \
+                                                For help reach out to Mike. For version info, run `GL-version`.",
+                                 epilog="Ex. usage: GL-est-rRNA-percentages Mus-musculus\n")
+
+required = parser.add_argument_group('required arguments')
+
+required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store", required = True)
+
+required.add_argument('--ref', help = "The primary target organism/clade", 
+                      action = "store", required = True, choices = ['Mus-musculus', 
+                                                                    'H-sapiens', 
+                                                                    'D-melanogaster',
+                                                                    'A-thaliana',
+                                                                    'B-distachyon',
+                                                                    'R-norvegicus',
+                                                                    'Escherichia',
+                                                                    'Pseudomonas',
+                                                                    'Staphylococcus',
+                                                                    'Streptococcus'])
+
+parser.add_argument("-g", "--GLDS-ID", help = 'GLDS ID if there is one (e.g. "GLDS-480")', action = "store", default = "GLDS-XXX")
+
+parser.add_argument("-j", "--jobs", help = "Number of jobs to run in parallel (default: 5)", action = "store", default = 5, type = int)
+
+parser.add_argument("-i", "--input-reads-dir", help = "Directory holding input reads (default: current working directory)", action = "store", default = "./", type = str)
+
+parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
+
+parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
+
+
+if len(sys.argv)==1:
+    parser.print_help(sys.stderr)
+    sys.exit(0)
+
+args = parser.parse_args()
+
+
+### expected references dict
+expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
+                           "D-melanogaster": "rrna-Dmelanogaster.fasta",
+                           "H-sapiens": "rrna-Hsapiens.fasta",
+                           "Pseudomonas": "rrna-Pseudomonas.fasta",
+                           "Staphylococcus": "rrna-Staphylococcus.fasta",
+                           "B-distachyon": "rrna-Bdistachyon.fasta",
+                           "Escherichia": "rrna-Escherichia.fasta",
+                           "Mus-musculus": "rrna-Mmusculus.fasta",
+                           "R-norvegicus": "rrna-Rnorvegicus.fasta",
+                           "Streptococcus": "rrna-Streptococcus.fasta"}
+
+
+
+
+################################################################################
+
+def main():
+
+    ### pre-flight checks ###
+
+    # checking reference variable, directory, and files exist as expected
+    check_for_refs(expected_reference_dict)
+
+    # checking input files exist and are found
+    checking_inputs()
+    
+    # checking snakemake slurm profile exists
+    check_for_snakemake_slurm_profile()
+
+    ### good to go ###
+
+    # creating the Snakefile
+    write_snakefile(snakefile_text)
+
+    # building snakemake call
+    snakemake_call = build_snakemake_call()
+
+    # execute snakemake workflow
+    execute_snakemake_wf(snakemake_call)
+
+################################################################################
+
+### variables and functions ###
+
+tty_colors = {
+    'green' : '\033[0;32m%s\033[0m',
+    'yellow' : '\033[0;33m%s\033[0m',
+    'red' : '\033[0;31m%s\033[0m'
+}
+
+
+def color_text(text, color='green'):
+    if sys.stdout.isatty():
+        return tty_colors[color] % text
+    else:
+        return text
+
+
+def wprint(text):
+    print(textwrap.fill(text, width=80, initial_indent="  ", 
+          subsequent_indent="  ", break_on_hyphens=False))
+
+
+def report_message(message, color = "yellow"):
+    print("")
+    wprint(color_text(message, color))
+
+
+def exit_message():
+    print("\n  Contact Mike for help if needed.\n\n  Exiting for now.\n")
+    exit(1)
+
+
+def check_for_refs(expected_reference_dict):
+
+    """ 
+    this checks if the expected system variable is set and if it is a directory 
+    holding the expected reference files
+    """
+
+    # making sure variable is set
+    try:
+    
+        ref_dir = os.environ['rRNA_refs']
+
+    except:
+
+        report_message("The system environment variable 'rRNA_refs' needs to be set and holding the path to the directory containing the reference rRNA fasta files.")
+        exit_message()
+
+    # making sure it holds a directory
+    if not os.path.isdir(ref_dir):
+
+        report_message(f"The system environment variable 'rRNA_refs' holds '{ref_dir}', but this doesn't seem to be a directory.")
+        exit_message()
+
+    # making sure all expected files are there
+    for file in expected_reference_dict.values():
+
+        ref_path = os.path.join(ref_dir, file)
+
+        if not os.path.exists(ref_path):
+
+            report_message(f"The 'rRNA_refs' directory doesn't seem to hold all expected reference files.")
+            print(f"\n  For example, here is one that's expected but missing:\n")
+            print(f"            {file}\n")
+            exit_message()
+
+
+def checking_inputs():
+
+    """ this makes sure the expected input files can be found where specified, and read files match what's expected """
+
+    # checking sample names file exists
+    if not os.path.exists(args.sample_names_file):
+
+        report_message(f"The specified input sample-names-file '{args.sample_names_file}' doesn't seem to exist.")
+        exit_message()
+
+
+    # making sure specified input reads directory exists
+    if not os.path.isdir(args.input_reads_dir):
+
+        report_message(f"The specified input reads directory '{args.input_reads_dir}' doesn't seem to be a directory.")
+        exit_message()
+
+
+    # reading sample names into list
+    with open(args.sample_names_file) as in_file:
+
+        samples_list = [line.strip() for line in in_file]
+
+
+    # getting all input read files based on expected suffixes (since these come from our previous raw data V+V, these should be standard already)
+    # and checking number of them and that they match up with the names in the input sample names file
+    if not args.single_ended:
+
+        input_read_path_and_glob_pattern = os.path.join(args.input_reads_dir, "*_R?_raw.fastq.gz")
+        all_input_files = glob.glob(input_read_path_and_glob_pattern)
+
+        # checking number
+        if len(all_input_files) != len(samples_list) * 2:
+
+            report_message(f"The number of input read file(s) expected based on the input '{args.sample_names_file}' file is {len(samples_list) * 2}, but {len(all_input_files)} were detected.")
+            exit_message()
+
+        # making list of all unique names from detected files
+        detected_unique_filenames = []
+
+        for file in all_input_files:
+
+            file = os.path.basename(file)
+            
+            if file.endswith("_R1_raw.fastq.gz"):
+
+                detected_unique_filenames.append(file.replace("_R1_raw.fastq.gz", ""))
+
+
+    else:
+        # if single-end
+        input_read_path_and_glob_pattern = os.path.join(args.input_reads_dir, "*_raw.fastq.gz")
+        all_input_files = glob.glob(input_read_path_and_glob_pattern)
+
+        # checking number
+        if len(all_input_files) != len(samples_list):
+
+            report_message(f"The number of input read file(s) expected based on the input '{args.sample_names_file}' file is {len(samples_list)}, but {len(all_input_files)} were detected.")
+            exit_message()
+
+        # making list of all unique names from detected files
+        detected_unique_filenames = []
+
+        for file in all_input_files:
+
+            file = os.path.basename(file)
+            
+            detected_unique_filenames.append(file.replace("_raw.fastq.gz", ""))
+
+
+    # checking names match
+    for sample_ID in samples_list:
+
+        if sample_ID not in detected_unique_filenames:
+
+            report_message(f"The expected sample, '{sample_ID}', from the input '{args.sample_names_file}' file did not successfully have any reads found.")
+            exit_message()
+
+
+def check_for_snakemake_slurm_profile():
+
+    """ this just makes sure the file exists where expected, will fail """
+
+    if args.slurm:
+    
+        expected_snakemake_slurm_profile_path = os.path.join(os.path.expanduser('~'), ".config/snakemake/est-rRNA-slurm/config.yaml")
+
+        if not os.path.exists(expected_snakemake_slurm_profile_path):
+
+            report_message(f"The required snakemake-slurm config file doesn't seem to exist.")
+            exit_message()
+
+
+def build_snakemake_call():
+
+    """ this builds the command-line call to execute the snakemake workflow """
+
+    jobs = args.jobs
+    sample_IDs_file = args.sample_names_file
+    input_reads_dir = args.input_reads_dir
+    primary_target_ref = args.ref
+    primary_target_ref_filename = expected_reference_dict[args.ref]
+    ref_dir = os.environ['rRNA_refs']
+    GLDS_ID = args.GLDS_ID
+    single_ended = args.single_ended
+
+    snakemake_call = ["snakemake",
+                      f"--config",
+                      f"sample_IDs_file={sample_IDs_file}",
+                      f"input_reads_dir='{input_reads_dir}'",
+                      f"primary_target_ref={primary_target_ref}",
+                      f"primary_target_ref_filename={primary_target_ref_filename}",
+                      f"ref_dir='{ref_dir}'",
+                      f"GLDS_ID={GLDS_ID}",
+                      f"single_ended={single_ended}"]
+
+
+    # pointing to slurm profile for this if '--slurm' was specified
+    if args.slurm:
+
+        snakemake_call.append("--profile")
+        snakemake_call.append("est-rRNA-slurm")
+        snakemake_call.append("--jobs")
+        snakemake_call.append(str(jobs))
+
+    else:
+
+        snakemake_call.append(f"--jobs {jobs}")
+        snakemake_call = " ".join(snakemake_call)
+
+
+    return(snakemake_call)
+
+
+def execute_snakemake_wf(snakemake_call):
+
+    if not args.slurm:
+    
+        # running it straight if called without the `--slurm` option
+        report_message("Executing Snakemake workflow:", "green")
+        print("")
+        os.system(snakemake_call)
+
+    else:
+
+        # running it in the background and exiting if called with `--slurm`
+        report_message("The snakemake workflow has been executed through slurm.", "green")
+        print("\n    You can check it's progress in slurm with `squeue`, and the log is being written to 'snakemake.log'.")
+        print(f"    When it's finished, '{args.GLDS_ID}-estimated-rRNA-percentages.tsv' will be the primary output file.\n")
+
+        with open("snakemake.log", "w") as log_file:
+
+            subprocess.Popen(snakemake_call, stdout = log_file, stderr = log_file)
+
+
+def write_snakefile(snakefile_text):
+
+    """ this creates the needed Snakefile based on the variable below """
+
+    with open("Snakefile", "w") as out_file:
+
+        out_file.write(snakefile_text)
+
+
+snakefile_text = '''
+####################################################################################################
+## Snakefile for GeneLab for estimating percentages of rRNA in RNAseq datasets                    ##
+## This is currently written for internal use only, and likely won't work as-is for non-GL folks  ##
+## This Snakefile was generated by the genelab-utils `GL-est-rRNA-percentages` program            ##
+## For help contact Michael D. Lee (Mike.Lee@nasa.gov)                                            ##
+####################################################################################################
+
+import os
+import json
+import pandas as pd
+
+## reading samples into list and setting some variables from command-line parameters
+sample_ID_list = [line.strip() for line in open(config["sample_IDs_file"])]
+ref_dir = config["ref_dir"]
+primary_target_ref_filename = config["primary_target_ref_filename"]
+primary_target_ref_path = os.path.join(ref_dir, primary_target_ref_filename)
+
+
+
+########################################
+############# Rules start ##############
+########################################
+
+rule all:
+    input:
+        config["GLDS_ID"] + "-estimated-rRNA-percentages.tsv"
+
+if config["single_ended"] != True:
+
+    rule hts_Seq_Screen:
+        input:
+            R1 = config["input_reads_dir"] + "{ID}_R1_raw.fastq.gz",
+            R2 = config["input_reads_dir"] + "{ID}_R2_raw.fastq.gz"
+
+        output:
+            json_log = "{ID}-rRNA-screen.log"
+
+        shell:
+            """
+            hts_SeqScreener -1 {input.R1} -2 {input.R1} -C -r -L {output.json_log} \
+                | hts_SeqScreener -s {primary_target_ref_path} -C -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -C -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -C -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -C -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -C -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -C -r -A {output.json_log} > /dev/null
+            """
+
+else:
+
+    rule hts_Seq_Screen:
+        input:
+            reads = config["input_reads_dir"] + "{ID}_raw.fastq.gz"
+
+        output:
+            json_log = "{ID}-rRNA-screen.log"
+
+        shell:
+            """
+            hts_SeqScreener -U {input.reads} -r -L {output.json_log} \
+                | hts_SeqScreener -s {primary_target_ref_path} -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -r -A {output.json_log} \
+                | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -r -A {output.json_log} > /dev/null
+            """
+
+
+
+rule combine_outputs:
+    input:
+        expand("{ID}-rRNA-screen.log", ID = sample_ID_list)
+
+    output:
+        out_file = config["GLDS_ID"] + "-estimated-rRNA-percentages.tsv"
+
+    run:
+        out_tab = make_tables(input)
+        out_tab.to_csv(output.out_file, sep = "\t", index = False)
+
+
+
+########################################
+############## Functions ###############
+########################################
+
+def make_tables(list_of_files):
+
+    """ 
+    this takes a list of input paths to the json log files, parses them and calculates percentages of hits
+    """
+
+    # starting empty list of rows we combine at end
+    list_of_rows = []
+
+    for input_file in list_of_files: 
+
+        # reading in json log file
+        with open(input_file) as json_file:
+
+            log_json = json.load(json_file)
+
+        # getting sample ID
+        sample_name = log_json[0]["Program_details"]["options"]["stats-file"].replace("-rRNA-screen.log", "")
+
+        # getting number of reads in sample
+        num_sample_total_reads = log_json[0]["Fragment"]["in"]
+
+        # making dictionary to hold info for this sample
+        sample_dict = {"sample": sample_name, "num_reads": num_sample_total_reads}
+
+        # getting the hits to each target ref
+        for element in log_json:
+            
+            # getting target ref
+            if element["Program_details"]["options"].get("seq") is not None:
+
+                target_ref = os.path.basename(element["Program_details"]["options"]["seq"]).replace(".fasta", "").replace("rrna-", "")
+
+            else:
+
+                target_ref = "phiX"
+
+            # getting hits
+            if config["single_ended"] == True:
+
+                num_hits = element["Single_end"]["hits"]
+
+            else:
+
+                num_hits = element["Paired_end"]["hits"]
+
+
+            # getting percent of total
+            perc_hits = round(num_hits / num_sample_total_reads * 100, 2)
+
+            # adding to dictionary
+            sample_dict[f"perc_{target_ref}_rRNA_hits"] = perc_hits
+
+        # turning into dataframe (single row)
+        curr_tab = pd.DataFrame(sample_dict, index = [sample_name])
+
+        # combining with previous ones if any
+        list_of_rows.append(curr_tab)
+
+    # combining rows into one table
+    out_tab = pd.concat(list_of_rows)
+
+    # appending "-primary-target" to 4th column name
+    out_tab.rename(columns = {out_tab.columns[3]: out_tab.columns[3] + "-primary-target"}, inplace = True)
+
+    return(out_tab)
+
+'''
+
+
+if __name__ == "__main__":
+    main()
