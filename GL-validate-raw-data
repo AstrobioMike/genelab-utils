@@ -71,7 +71,12 @@ if args.slurm:
 
 def main():
 
+
     if args.slurm:
+
+        # pre-flight check so things aren't passed to slurm before finding a problem
+        # so folks will be notified immediately by this script rather than only in the slurm output log
+        map_dict = check_files_and_gen_unique_ID_to_file_map(args.number_of_samples)
 
         # making command and submitting as slurm job if --slurm was specified
         submit_slurm()
