@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser(description = "This is currently just an intern
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store", required = True)
+required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names (primary output table will match this order)", action="store", required = True)
 
 required.add_argument('--ref', help = "The primary target organism/clade",
                       action = "store", required = True, choices = ['Mus-musculus',
