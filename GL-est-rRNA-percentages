@@ -36,7 +36,7 @@ required.add_argument('--ref', help = "The primary target organism/clade",
 
 parser.add_argument("-g", "--GLDS-ID", help = 'GLDS ID if there is one (e.g. "GLDS-480")', action = "store", default = "GLDS-XXX")
 
-parser.add_argument("-j", "--jobs", help = "Number of jobs to run in parallel (default: 5)", action = "store", default = 5, type = int)
+parser.add_argument("-j", "--jobs", help = "Number of jobs to run in parallel (default: 10)", action = "store", default = 10, type = int)
 
 parser.add_argument("-i", "--input-reads-dir", help = "Directory holding input reads (default: current working directory)", action = "store", default = "./", type = str)
 
