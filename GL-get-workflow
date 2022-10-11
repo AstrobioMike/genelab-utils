@@ -42,10 +42,10 @@ args = parser.parse_args()
 base_repo = "https://github.com/asaravia-butler/GeneLab_Data_Processing/"
 # base_repo = "https://github.com/nasa/GeneLab_Data_Processing/"
 
-# base_download_link = base_repo + "releases/download/"
-base_download_link = base_repo + "archive/refs/tags/"
-# releases_page_link = base_repo + "releases"
-tags_page_link = base_repo + "tags"
+base_download_link = base_repo + "releases/download/"
+# base_download_link = base_repo + "archive/refs/tags/"
+releases_page_link = base_repo + "releases"
+# tags_page_link = base_repo + "tags"
 
 # core workflow info
 workflow_dict = {
@@ -97,14 +97,16 @@ def get_versions_available(target_wf) -> list:
 
     """ this finds which versions are available on the release page and returns them as a list """
 
-    # # accessing release page
-    # release_page = HTMLSession().get(releases_page_link)
+    # accessing release page
+    release_page = HTMLSession().get(releases_page_link)
 
     # accessing tags page (had trouble pulling from release page at some point)
-    tags_page = HTMLSession().get(tags_page_link)
+    # tags_page = HTMLSession().get(tags_page_link)
 
     # getting all links available on that page
-    links = tags_page.html.absolute_links
+    links = release_page.html.absolute_links
+
+    # links = tags_page.html.absolute_links
     
     # starting empty list of available versions
     available_versions = []
@@ -114,8 +116,8 @@ def get_versions_available(target_wf) -> list:
         # getting just those for the requested workflow
         if re.search(target_wf, link):
 
-            # getting just those that hold a release zip
-            if re.search("refs/tags", link) and re.search(".zip", link):
+            # getting just those that hold a tag which should help us get the version
+            if re.search("releases/tag", link):
 
                 # cutting out just the version info
                 link_basename = os.path.basename(link)
@@ -169,11 +171,13 @@ def download_and_unzip(target_link):
 
     downloaded_basename = os.path.basename(target_link).replace(".zip", "")
 
-    os.rename("GeneLab_Data_Processing" + "-" + downloaded_basename, downloaded_basename)
+    # os.rename("GeneLab_Data_Processing" + "-" + downloaded_basename, downloaded_basename)
 
     report_message(f"The {args.workflow} workflow was downloaded to '{downloaded_basename}/'", "green")
 
-    print(f"\n    It was pulled from this location:\n         {tags_page_link}\n")
+    print(f"\n    It was pulled from this release page:\n         {releases_page_link}\n")
+    
+    # print(f"\n    It was pulled from this location:\n         {tags_page_link}\n")
 
 
 def dl_wf(target_wf):
@@ -207,6 +211,7 @@ def dl_wf(target_wf):
     check_if_dir_already_exists(full_target_name)
 
     download_and_unzip(full_link)
+
 
 ################################################################################
 
