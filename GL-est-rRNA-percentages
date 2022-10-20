@@ -30,6 +30,7 @@ required.add_argument('--ref', help = "The primary target organism/clade",
                                                                     'B-distachyon',
                                                                     'R-norvegicus',
                                                                     'Escherichia',
+                                                                    'Mycobacterium',
                                                                     'Pseudomonas',
                                                                     'Staphylococcus',
                                                                     'Streptococcus'])
@@ -38,7 +39,7 @@ parser.add_argument("-g", "--GLDS-ID", help = 'GLDS ID if there is one (e.g. "GL
 
 parser.add_argument("-j", "--jobs", help = "Number of jobs to run in parallel (default: 10)", action = "store", default = 10, type = int)
 
-parser.add_argument("-i", "--input-reads-dir", help = "Directory holding input reads (default: current working directory)", action = "store", default = "./", type = str)
+parser.add_argument("-i", "--input-reads-dir", help = "Directory holding input reads (default: current working directory)", action = "store", default = "", type = str)
 
 parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
 
@@ -60,11 +61,18 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
                            "Staphylococcus": "rrna-Staphylococcus.fasta",
                            "B-distachyon": "rrna-Bdistachyon.fasta",
                            "Escherichia": "rrna-Escherichia.fasta",
+                           "Mycobacterium": "rrna-Mycobacterium.fasta",
                            "Mus-musculus": "rrna-Mmusculus.fasta",
                            "R-norvegicus": "rrna-Rnorvegicus.fasta",
                            "Streptococcus": "rrna-Streptococcus.fasta"}
 
-data_of_rRNA_refs_fetched = "01-Sep-2021"
+# setting date retrieved (will need to adjust/efficiency-ize this as more are added)
+if args.ref == "Mycobacterium":
+    data_of_rRNA_refs_fetched = "20-Oct-2022"
+else:
+    data_of_rRNA_refs_fetched = "01-Sep-2021"
+
+
 blurb_file = str(args.GLDS_ID) + "-estimate-rRNA-blurb.txt"
 
 ################################################################################
@@ -176,11 +184,13 @@ def checking_inputs():
         exit_message()
 
 
-    # making sure specified input reads directory exists
-    if not os.path.isdir(args.input_reads_dir):
+    # making sure specified input reads directory exists if not left as current working dir
+    if not args.input_reads_dir == "":
 
-        report_message(f"The specified input reads directory '{args.input_reads_dir}' doesn't seem to be a directory.")
-        exit_message()
+        if not os.path.isdir(args.input_reads_dir):
+
+            report_message(f"The specified input reads directory '{args.input_reads_dir}' doesn't seem to be a directory.")
+            exit_message()
 
 
     # reading sample names into list
