@@ -16,7 +16,7 @@ All programs are prefixed with `GL-` and have a help menu accessible with `-h`. 
 ---
 
 ## Some example pages
-- Programmatically ownloading [GLDS data](https://genelab-data.ndc.nasa.gov/genelab/)
+- Programmatically downloading [GLDS data](https://genelab-data.ndc.nasa.gov/genelab/)
   - [`GL-download-GLDS-data`](https://hackmd.io/@astrobiomike/using-genelab-utils-to-download-GLDS-data)  
 - Downloading GeneLab workflows
   - [`GL-get-workflow`](https://hackmd.io/@astrobiomike/using-genelab-utils-to-download-workflows)  
