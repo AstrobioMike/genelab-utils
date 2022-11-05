@@ -39,8 +39,7 @@ args = parser.parse_args()
 
 ### variables we'd likely want to adjust first ###
 
-base_repo = "https://github.com/AstrobioMike/temp-workflow-holds/"
-# base_repo = "https://github.com/nasa/GeneLab_Data_Processing/"
+base_repo = "https://github.com/nasa/GeneLab_Data_Processing/"
 
 base_download_link = base_repo + "releases/download/"
 # base_download_link = base_repo + "archive/refs/tags/"
