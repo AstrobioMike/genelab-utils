@@ -84,7 +84,7 @@ def main():
 
 
     # getting GLDS file-info into table
-    report_message("Retrieving " + args.GLDS_ID + " file data from:")
+    report_message("Attempting to retrieve '" + args.GLDS_ID + "' file data from:")
     print("    " + GLDS_file_json_url + "\n")
     
     gen_files_table(GLDS_file_json_url)
@@ -172,10 +172,16 @@ def gen_files_table(files_info_url):
 
         files_json = loads(json.read().decode())
 
-    files_dict = files_json["studies"][OSD_acc]["study_files"]
+    try:
+        files_dict = files_json["studies"][OSD_acc]["study_files"]
+
+    except KeyError:
+
+        report_message(f"The input --GLDS-ID argument, '{args.GLDS_ID}', was not found :(", "yellow")
+        print("")
+        exit(1)
 
     # writing out table with filenames and their urls
-
     with open(GLDS_file_info_output_tab, "w") as out_file:
 
         # starting header
