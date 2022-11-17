@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser(description = "This is a program for downloadin
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True, type = str)
+required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276") or ODS ID (e.g. "ODS-276")', action="store", required = True, type = str)
 
 required.add_argument("-p", "--pattern", help = "If we do not want to download all files (which we often won't), we can specify \
                       a pattern here to subset the total files. For example, if we know we want to download just the fastq.gz \
@@ -54,25 +54,34 @@ if len(sys.argv)==1:
 
 args = parser.parse_args()
 
-download_commands_file = str(args.GLDS_ID) + "-wanted-file-download-commands.sh"
-not_downloaded_files_file = str(args.GLDS_ID) + "-files-targeted-but-not-downloaded.txt"
+# if input was provided as GLDS, changing to OSD due to update to data repository
+OSD_acc = args.GLDS_ID.replace("GLDS", "OSD")
 
-GLDS_file_json_url = "https://genelab-data.ndc.nasa.gov/genelab/data/glds/files/" + str(args.GLDS_ID).removeprefix("GLDS-")
+# making sure we have a GLDS version for output files
+GLDS_acc = args.GLDS_ID.replace("OSD", "GLDS")
+
+GLDS_file_json_url = "https://genelab-data.ndc.nasa.gov/genelab/data/glds/files/" + str(OSD_acc).removeprefix("OSD-")
 
 base_file_url_prefix = "https://genelab-data.ndc.nasa.gov"
 
-GLDS_file_info_output_tab = args.GLDS_ID + "-file-info.tsv"
+GLDS_file_info_output_tab = GLDS_acc + "-file-info.tsv"
+
+download_commands_file = str(GLDS_acc) + "-wanted-file-download-commands.sh"
+not_downloaded_files_file = str(GLDS_acc) + "-files-targeted-but-not-downloaded.txt"
 
 ################################################################################
 
 def main():
 
-    # making sure input fits format
+    # making sure input fits expected format
     if not args.GLDS_ID.startswith("GLDS-"):
+        
+        if not args.GLDS_ID.startswith("OSD-"):
 
-        report_message("The input --GLDS-ID argument needs to be in the format of 'GLDS-' followed by the appropriate GLDS number.")
-        print("")
-        exit(1)
+            report_message("The input --GLDS-ID argument needs to be in the format of 'GLDS-' or 'OSD-' followed by the appropriate accession number.")
+            print("")
+            exit(1)
+
 
     # getting GLDS file-info into table
     report_message("Retrieving " + args.GLDS_ID + " file data from:")
@@ -163,7 +172,7 @@ def gen_files_table(files_info_url):
 
         files_json = loads(json.read().decode())
 
-    files_dict = files_json["studies"][args.GLDS_ID]["study_files"]
+    files_dict = files_json["studies"][OSD_acc]["study_files"]
 
     # writing out table with filenames and their urls
 
@@ -208,12 +217,12 @@ def check_expected_files_were_downloaded(target_files, num_files_to_download):
             for file in missing_files:
                 out_file.write(f"{file}\n")
 
-        report_message(f"Some files ({num_missing}) weren't successfully downloaded for some reason. They have been written to:")
+        report_message(f"Some file ({num_missing}) weren't successfully downloaded for some reason. They have been written to:")
         print(f"    {not_downloaded_files_file}\n")
 
     else:
 
-        report_message(f"All {num_files_to_download} files have been successfully downloaded :)", "green")
+        report_message(f"All {num_files_to_download} file(s) have been successfully downloaded :)", "green")
         print("")
 
     report_message(f"The download commands executed were written to:")
