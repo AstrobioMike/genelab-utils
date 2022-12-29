@@ -16,11 +16,21 @@ from urllib.request import urlopen
 import tempfile
 
 parser = argparse.ArgumentParser(description = "This is a program for downloading GLDS data files. For version info, run \
-                                                `GL-version`.")
+                                                `GL-version`.",
+                                 epilog = "\033[0;33m\
+                                            NOTICE: Some confusion may arise due to recent changes. It is possible that \
+                                            a GLDS ID and an OSD ID may not match up, e.g., 'OSD-561' (https://osdr.nasa.gov/bio/repo/data/studies/OSD-561) \
+                                            holds 'GLDS-556' (which we can see at the very top, just under the image next to the title). Moving forward, \
+                                            IT IS RECOMMENDED to search for the OSD ID (which you can search for based on a given GLDS ID here: https://osdr.nasa.gov/bio/repo/search) – \
+                                            as that will find all the associated GLDS files no matter what their GLDS ID's are. E.g., 'GL-download-GLDS-data -g OSD-561 --print-only'. \
+                                            Contact Mike Lee at Mike.Lee@nasa.gov if having trouble. \
+                                            \
+                                          \033[0m")
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276") or ODS ID (e.g. "ODS-276")', action="store", required = True, type = str)
+required.add_argument("-g", "--OSD-or-GLDS-ID", help='OSD ID (e.g., "ODS-276") or GLDS ID (e.g. "GLDS-276"); be sure to read the NOTICE at the bottom of the help menu', 
+                      action="store", required = True, type = str)
 
 required.add_argument("-p", "--pattern", help = "If we do not want to download all files (which we often won't), we can specify \
                       a pattern here to subset the total files. For example, if we know we want to download just the fastq.gz \
@@ -47,36 +57,36 @@ parser.add_argument("-m", "--mode", choices = {"exclusive", "additive"}, help = 
                     default = "exclusive", action = "store", type = str)
 
 
-
-if len(sys.argv)==1:
+if len(sys.argv) == 1:
     parser.print_help(sys.stderr)
     sys.exit(0)
 
 args = parser.parse_args()
 
 # if input was provided as GLDS, changing to OSD due to update to data repository
-OSD_acc = args.GLDS_ID.replace("GLDS", "OSD")
-
-# making sure we have a GLDS version for output files
-GLDS_acc = args.GLDS_ID.replace("OSD", "GLDS")
+OSD_acc = args.OSD_or_GLDS_ID.replace("GLDS", "OSD")
 
 GLDS_file_json_url = "https://genelab-data.ndc.nasa.gov/genelab/data/glds/files/" + str(OSD_acc).removeprefix("OSD-")
 
 base_file_url_prefix = "https://genelab-data.ndc.nasa.gov"
 
-GLDS_file_info_output_tab = GLDS_acc + "-file-info.tsv"
+GLDS_file_info_output_tab = OSD_acc + "-file-info.tsv"
 
-download_commands_file = str(GLDS_acc) + "-wanted-file-download-commands.sh"
-not_downloaded_files_file = str(GLDS_acc) + "-files-targeted-but-not-downloaded.txt"
+download_commands_file = str(OSD_acc) + "-wanted-file-download-commands.sh"
+not_downloaded_files_file = str(OSD_acc) + "-files-targeted-but-not-downloaded.txt"
 
 ################################################################################
 
 def main():
 
+    if args.OSD_or_GLDS_ID.startswith("GLDS-"):
+
+        confirm_continue_with_GLDS_search()
+
     # making sure input fits expected format
-    if not args.GLDS_ID.startswith("GLDS-"):
+    if not args.OSD_or_GLDS_ID.startswith("GLDS-"):
         
-        if not args.GLDS_ID.startswith("OSD-"):
+        if not args.OSD_or_GLDS_ID.startswith("OSD-"):
 
             report_message("The input --GLDS-ID argument needs to be in the format of 'GLDS-' or 'OSD-' followed by the appropriate accession number.")
             print("")
@@ -84,7 +94,7 @@ def main():
 
 
     # getting GLDS file-info into table
-    report_message("Attempting to retrieve '" + args.GLDS_ID + "' file data from:")
+    report_message("Attempting to retrieve '" + args.OSD_or_GLDS_ID + "' file data from:")
     print("    " + GLDS_file_json_url + "\n")
     
     gen_files_table(GLDS_file_json_url)
@@ -163,7 +173,7 @@ def report_message(message, color = "yellow"):
 def gen_files_table(files_info_url):
 
     """
-    This function access the files info json from https://genelab-data.ndc.nasa.gov/genelab/data/glds/files/<GLDS_ID>
+    This function access the files info json from https://genelab-data.ndc.nasa.gov/genelab/data/glds/files/<OSD_ID>
     and creates a table with filenames and links
     """
 
@@ -177,7 +187,8 @@ def gen_files_table(files_info_url):
 
     except KeyError:
 
-        report_message(f"The input --GLDS-ID argument, '{args.GLDS_ID}', was not found :(", "yellow")
+        report_message(f"The input --OSD-or-GLDS-ID argument, '{args.OSD_or_GLDS_ID}', was not found :(", "yellow")
+        report_message("See NOTICE in help menu in case it's relevant to this case ('GL-download-GLDS-data -h').")
         print("")
         exit(1)
 
@@ -355,36 +366,70 @@ def download(target_files, in_tab, num_files_to_download):
 
 def print_target_files(target_files, num_files_to_download):
 
-        report_message(f"As requested, here are the {num_files_to_download} files that would be downloaded by this command if run without the '--print-only' flag:")
-        print()
-        sleep(2.5)
+    report_message(f"As requested, here are the {num_files_to_download} files that would be downloaded by this command if run without the '--print-only' flag:")
+    print()
+    sleep(2.5)
 
-        for filename in target_files:
-            print(f"    {filename}")
-            sleep(0.01)
+    for filename in target_files:
+        print(f"    {filename}")
+        sleep(0.01)
 
-        print("")
-        exit(0)
+    print("")
+    exit(0)
 
 
 def confirm_download(num_files_to_download):
 
-        report_message(f"If you'd just like to see a list of the file(s) that would be downloaded, here is your chance to exit and rerun the command with the '--print-only' flag...")
-        sleep(1)
+    report_message(f"If you'd just like to see a list of the file(s) that would be downloaded, here is your chance to exit and rerun the command with the '--print-only' flag...")
+    sleep(1)
+    print("")
+
+    print(f"    Enter 'y' if you'd like to begin downloading {num_files_to_download} file(s),")
+    response = input("    enter any other key to exit without downloading: ")
+
+    if response != "y":
+
+        report_message(f"Exiting without downloading :)")
+        print("")
+        exit(0)
+
+    else:
+
         print("")
 
-        print(f"    Enter 'y' if you'd like to begin downloading {num_files_to_download} file(s),")
-        response = input("    enter any other key to exit without downloading: ")
 
-        if response != "y":
+def confirm_continue_with_GLDS_search():
 
-            report_message(f"Exiting without downloading :)")
-            print("")
-            exit(0)
+    report_message("NOTICE!")
+    report_message("We see that you are searching by a GLDS-ID, and we want to note that some confusion may arise due to recent changes.")
+    report_message("It is possible that \
+a GLDS ID and an OSD ID may not match up, e.g., 'OSD-561' (https://osdr.nasa.gov/bio/repo/data/studies/OSD-561) \
+holds 'GLDS-556' (we can see the GLDS ID at the very top of that page, just under the image next to the title).")
+    report_message("Moving forward, IT IS RECOMMENDED to search for the OSD ID (which you can search for based on a given GLDS ID here: https://osdr.nasa.gov/bio/repo/search) \
+– as that will find all the associated GLDS files no matter what their GLDS ID's are. E.g., 'GL-download-GLDS-data -g OSD-561 --print-only'.")
+    report_message("This is only a notice, and you are free to move forward with searching by GLDS ID, but be sure to check visually against the \
+appropriate repository page that you are getting all the desired files, and consider using the OSD ID instead :)")
+    report_message("Contact Mike Lee at Mike.Lee@nasa.gov if having trouble.")
 
-        else:
+    sleep(3)
+    print("")
 
-            print("")
+    print(f"    Enter 'y' if you'd like to continue with the GLDS-ID search,")
+    response = input("    or enter any other key to exit and re-do the search based on the OSD ID (recommended): ")
+
+    if response != "y":
+
+        report_message(f"Exiting for now :)")
+        report_message("Opening this page might get you started on finding the appropriate OSD ID to search with, if the input GLDS-ID can be found: ")
+        report_message(f"    https://osdr.nasa.gov/bio/repo/search?q={args.OSD_or_GLDS_ID}")
+        print("")
+        exit(0)
+
+    else:
+
+        print("")
+
+    exit()
 
 
 if __name__ == "__main__":
