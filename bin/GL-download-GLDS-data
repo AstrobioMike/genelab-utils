@@ -39,6 +39,9 @@ required.add_argument("-p", "--pattern", help = "If we do not want to download a
                       '-p fastq.gz,NxtaFlex,metagenomics,raw'. Looking through the *-file-info.tsv table produced by this program when run \
                       with the '--just-get-file-info-table' flag can help figure this out if needed. (Note that this is case-sensitive.)", action = "store", type = str)
 
+
+parser.add_argument("-o", "--output-dir", help = "Directory to put downloaded files (default is current working directory)", default = ".", action = "store", type = str)
+
 parser.add_argument("-j", "--jobs", help = "Number of downloads to run in parallel (default: 10)", default = 10, action = "store", type = int)
 
 parser.add_argument("-P", "--print-only", help = "Just print out the files that would be downloaded, rather than downloading them \
@@ -127,11 +130,19 @@ def main():
 
         confirm_download(num_files_to_download)
 
+    # creating output directory exists if specified and if needed
+    if args.output_dir != ".":
+
+        if not os.path.exists(args.output_dir):
+
+            os.mkdir(args.output_dir)
+
+
     # building and performing download
-    download(target_files, in_tab, num_files_to_download)
+    download(target_files, in_tab, num_files_to_download, args.output_dir)
 
     # checking expected files were downloaded
-    check_expected_files_were_downloaded(target_files, num_files_to_download)
+    check_expected_files_were_downloaded(target_files, num_files_to_download, args.output_dir)
 
 ################################################################################
 
@@ -212,11 +223,11 @@ def gen_files_table(files_info_url):
     sleep(1)
 
 
-def check_expected_files_were_downloaded(target_files, num_files_to_download):
+def check_expected_files_were_downloaded(target_files, num_files_to_download, output_dir):
 
     """ this function checks the expected were downloaded """
 
-    cwd_files = os.listdir(".")
+    cwd_files = os.listdir(output_dir)
 
     missing_files = []
 
@@ -304,12 +315,12 @@ def get_targets(all_files, num_total_files):
     return(target_files, num_files_to_download)
 
 
-def download(target_files, in_tab, num_files_to_download):
+def download(target_files, in_tab, num_files_to_download, output_dir):
 
     """ this function prepares and performed the download with curl/parallel in subprocesses """
 
     # building download script based on curl
-    beginning_of_command = "curl -L -s -o"
+    beginning_of_command = "curl -L -s -o" 
 
     # putting commands into list also
     download_commands_list = []
@@ -320,9 +331,9 @@ def download(target_files, in_tab, num_files_to_download):
 
             target_url = in_tab.loc[in_tab['filename'] == file, 'url'].iloc[0]
 
-            download_script.write(f"{beginning_of_command} {file} '{target_url}'\n")
+            download_script.write(f"{beginning_of_command} {output_dir}/{file} '{target_url}'\n")
 
-            download_commands_list.append(f"{beginning_of_command} {file} '{target_url}'")
+            download_commands_list.append(f"{beginning_of_command} {output_dir}/{file} '{target_url}'")
 
 
     report_message(f"Beginning download of the {num_files_to_download} file(s)...")
