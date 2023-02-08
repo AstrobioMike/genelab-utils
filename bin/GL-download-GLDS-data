@@ -422,26 +422,27 @@ holds 'GLDS-556' (we can see the GLDS ID at the very top of that page, just unde
 appropriate repository page that you are getting all the desired files, and consider using the OSD ID instead :)")
     report_message("Contact Mike Lee at Mike.Lee@nasa.gov if having trouble.")
 
-    sleep(3)
-    print("")
+    sleep(1)
 
-    print(f"    Enter 'y' if you'd like to continue with the GLDS-ID search,")
-    response = input("    or enter any other key to exit and re-do the search based on the OSD ID (recommended): ")
-
-    if response != "y":
-
-        report_message(f"Exiting for now :)")
-        report_message("Opening this page might get you started on finding the appropriate OSD ID to search with, if the input GLDS-ID can be found: ")
-        report_message(f"    https://osdr.nasa.gov/bio/repo/search?q={args.OSD_or_GLDS_ID}")
-        print("")
-        exit(0)
+    if args.force:
+        report_message("Since you were using the `--force`/`-f` option, we are going to continue anyway, but still wanted to notify you.\n")
 
     else:
 
-        print("")
+        print(f"\n    Enter 'y' if you'd like to continue with the GLDS-ID search,")
+        response = input("    or enter any other key to exit and re-do the search based on the OSD ID (recommended): ")
 
-    exit()
+        if response != "y":
 
+            report_message(f"Exiting for now :)")
+            report_message("Opening this page might get you started on finding the appropriate OSD ID to search with, if the input GLDS-ID can be found: ")
+            report_message(f"    https://osdr.nasa.gov/bio/repo/search?q={args.OSD_or_GLDS_ID}")
+            print("")
+            exit(0)
+
+        else:
+
+            print("")
 
 if __name__ == "__main__":
     main()
