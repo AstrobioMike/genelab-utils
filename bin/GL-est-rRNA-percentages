@@ -12,7 +12,7 @@ import glob
 import subprocess
 
 parser = argparse.ArgumentParser(description = "This is currently just an internal GeneLab helper program for estimating percentages \
-                                                of rRNA reads for a few organisms in fastq files. It screens against a primary organism and a few others. \
+                                                of rRNA reads in fastq files for a few organisms. It screens against a primary organism and a few others. \
                                                 It is not currently written to work properly anywhere other than GeneLab's main cluster, and is not robust to \
                                                 things like varying file extensions (it is expected to have files already renamed in GL's convention). \
                                                 For help reach out to Mike. For version info, run `GL-version`.",
