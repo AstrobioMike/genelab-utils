@@ -55,6 +55,7 @@ args = parser.parse_args()
 
 ### expected references dict
 expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
+                           "G-hirsutum": "rrna-Ghirsutum.fasta",
                            "D-melanogaster": "rrna-Dmelanogaster.fasta",
                            "H-sapiens": "rrna-Hsapiens.fasta",
                            "Pseudomonas": "rrna-Pseudomonas.fasta",
@@ -69,6 +70,8 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
 # setting date retrieved (will need to adjust/efficiency-ize this as more are added)
 if args.ref == "Mycobacterium":
     data_of_rRNA_refs_fetched = "20-Oct-2022"
+elif args.ref == "G-hirsutum":
+    data_of_rRNA_refs_fetched = "10-Apr-2023"
 else:
     data_of_rRNA_refs_fetched = "01-Sep-2021"
 

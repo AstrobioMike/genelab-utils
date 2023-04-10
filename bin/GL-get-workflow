@@ -13,6 +13,8 @@ from requests_html import HTMLSession
 import zipfile
 from io import BytesIO
 import re
+import json
+from urllib.request import urlopen
 from packaging import version
 
 parser = argparse.ArgumentParser(description = "This is a helper program for downloading GeneLab workflows. For verison info run `GL-version`.",
@@ -43,7 +45,9 @@ base_repo = "https://github.com/nasa/GeneLab_Data_Processing/"
 
 base_download_link = base_repo + "releases/download/"
 # base_download_link = base_repo + "archive/refs/tags/"
-releases_page_link = base_repo + "releases"
+# releases_page_link = base_repo + "releases"
+releases_page_link = "https://api.github.com/repos/nasa/GeneLab_Data_Processing/releases"
+
 # tags_page_link = base_repo + "tags"
 
 # core workflow info
@@ -96,16 +100,13 @@ def get_versions_available(target_wf) -> list:
 
     """ this finds which versions are available on the release page and returns them as a list """
 
-    # accessing release page
-    release_page = HTMLSession().get(releases_page_link)
+    # accessing release page in json format    
+    releases_data = json.loads(urlopen(releases_page_link).read())
 
-    # accessing tags page (had trouble pulling from release page at some point)
-    # tags_page = HTMLSession().get(tags_page_link)
-
-    # getting all links available on that page
-    links = release_page.html.absolute_links
-
-    # links = tags_page.html.absolute_links
+    # getting all links available
+    links = []
+    for item in releases_data:
+        links.append(item['html_url'])
     
     # starting empty list of available versions
     available_versions = []
