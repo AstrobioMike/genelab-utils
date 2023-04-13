@@ -9,7 +9,7 @@ import sys
 import argparse
 import textwrap
 import pandas as pd
-# import tarfile
+import tarfile
 import zipfile
 
 parser = argparse.ArgumentParser(description="This program generates table needed by curation for GeneLab amplicon \
@@ -40,6 +40,8 @@ additional_prefix = str(args.additional_prefix)
 
 ### hard-coded stuff we might want to change ###
 file_prefix = args.GLDS_ID + "_GAmplicon_"
+# this one is only used for the raw data files
+raw_file_prefix = args.GLDS_ID + "_Amplicon_"
 
 raw_reads_dir = "Raw_Sequence_Data/"
 fastqc_dir = "FastQC_Outputs/"
@@ -288,7 +290,7 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
 
         if args.single_ended:
 
-            curr_raw_data = [file_prefix + sample + raw_suffix]
+            curr_raw_data = [raw_file_prefix + sample + raw_suffix]
             curr_trimmed_data = [file_prefix + sample + primer_trimmed_suffix, 
                                  file_prefix + additional_prefix + "trimmed-read-counts.tsv", 
                                  file_prefix + additional_prefix + "cutadapt.log"]
@@ -302,7 +304,7 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
 
         else:
 
-            curr_raw_data = [file_prefix + sample + raw_R1_suffix, file_prefix + sample + raw_R2_suffix]
+            curr_raw_data = [raw_file_prefix + sample + raw_R1_suffix, raw_file_prefix + sample + raw_R2_suffix]
             curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, 
                                  file_prefix + sample + primer_trimmed_R2_suffix, 
                                  file_prefix + additional_prefix + "trimmed-read-counts.tsv", 
