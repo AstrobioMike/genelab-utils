@@ -8,7 +8,8 @@ import os
 import sys
 import argparse
 import textwrap
-import tarfile
+from zipfile import ZipFile
+# import tarfile
 
 
 parser = argparse.ArgumentParser(description="This program generates the corresponding README file for GeneLab amplicon processed datasets. \
@@ -46,7 +47,7 @@ filtered_reads_dir = "Filtered_Sequence_Data/"
 final_outputs_dir = "Final_Outputs/"
 
 
-processing_tar_file = additional_prefix + "processing_info.tar"
+processing_zip_file = additional_prefix + "processing_info.zip"
 
 expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
 
@@ -56,13 +57,13 @@ def main():
 
     check_expected_directories()
 
-    processing_tar_contents = get_processing_tar_contents()
+    processing_zip_contents = get_processing_zip_contents()
 
     with open(output_file, "w") as output:
 
         write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
 
-        write_body(output, processing_tar_contents)
+        write_body(output, processing_zip_contents)
 
         output.write("\n")
 
@@ -82,7 +83,7 @@ def write_header(output, GLDS_ID, name, email, protocol_ID):
     output.writelines(header)
 
 
-def write_body(output, processing_tar_contents):
+def write_body(output, processing_zip_contents):
 
     # this file
     output.write("    {:<41} {:>0}".format("- " + str(output_file), "- this file\n\n"))
@@ -110,9 +111,11 @@ def write_body(output, processing_tar_contents):
     output.write("        {:<37} {:>0}".format("- *read-count-tracking.tsv", "- read counts at each processing step\n\n"))
 
     # processing info
-    output.write("    {:<41} {:>0}".format("- " + str(processing_tar_file), "- tarball holding info related to processing\n"))
-    for item in processing_tar_contents:
+    output.write("    {:<41} {:>0}".format("- " + str(processing_zip_file), "- zip archive holding info related to processing\n"))
+    for item in processing_zip_contents:
         num_levels = item.count("/")
+        if item.endswith('/'):
+            num_levels -= 1
         num_spaces = num_levels * 4
         output.write("        " + " " * num_spaces + "- " + str(item) + "\n")
 
@@ -165,7 +168,7 @@ def check_expected_directories():
 
 
 def check_for_file_and_contents(file_path):
-    """ used by get_processing_tar_contents function """
+    """ used by get_processing_zip_contents function """
 
     if not os.path.exists(file_path):
         report_failure("The expected file '" + str(file_path) + "' does not exist.")
@@ -173,20 +176,32 @@ def check_for_file_and_contents(file_path):
         report_failure("The file '" + str(file_path) + "' is empty.")
 
 
-def get_processing_tar_contents():
-    """ this gets the filenames that are in the processing_info.tar to add them to the readme """
+def get_processing_zip_contents():
+    """ this gets the filenames that are in the processing_info.zip to add them to the readme """
 
-    check_for_file_and_contents(processing_tar_file)
+    check_for_file_and_contents(processing_zip_file)
 
-    with tarfile.open(processing_tar_file) as tar_obj:
-#        entries = [os.path.basename(entry) for entry in tar_obj.getnames()][1:]
-#        entries = [os.path.basename(entry) for entry in tar_obj.getnames()]
-        entries = tar_obj.getnames()
+    with ZipFile(processing_zip_file) as zip_obj:
+
+        entries = zip_obj.namelist()
         entries.sort()
 
     return(entries)
 
 
+# def get_processing_tar_contents():
+#     """ this gets the filenames that are in the processing_info.tar to add them to the readme """
+
+#     check_for_file_and_contents(processing_tar_file)
+
+#     with tarfile.open(processing_tar_file) as tar_obj:
+# #        entries = [os.path.basename(entry) for entry in tar_obj.getnames()][1:]
+# #        entries = [os.path.basename(entry) for entry in tar_obj.getnames()]
+#         entries = tar_obj.getnames()
+#         entries.sort()
+
+#     return(entries)
+
+
 if __name__ == "__main__":
     main()
-
