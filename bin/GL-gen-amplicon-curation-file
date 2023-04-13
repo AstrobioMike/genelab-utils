@@ -9,7 +9,7 @@ import sys
 import argparse
 import textwrap
 import pandas as pd
-import tarfile
+# import tarfile
 import zipfile
 
 parser = argparse.ArgumentParser(description="This program generates table needed by curation for GeneLab amplicon \
@@ -57,7 +57,7 @@ filtered_suffix = "_filtered.fastq.gz"
 filtered_R1_suffix = "_R1_filtered.fastq.gz"
 filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
-processing_tar_file = additional_prefix + "processing_info.tar"
+processing_zip_file = additional_prefix + "processing_info.zip"
 
 
 ################################################################################
@@ -276,7 +276,7 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
                      file_prefix + additional_prefix + "taxonomy-and-counts.tsv", 
                      file_prefix + additional_prefix + "taxonomy.tsv"]
 
-    processing_info = file_prefix + additional_prefix + "processing_info.tar"
+    processing_info = file_prefix + additional_prefix + "processing_info.zip"
 
     read_count_unit = "read"
     read_count_term_source_ref = "SO"
@@ -554,4 +554,3 @@ def gen_and_write_out_filenames_table(sample_names, mapping_tab, read_count_tab)
 
 if __name__ == "__main__":
     main()
-
