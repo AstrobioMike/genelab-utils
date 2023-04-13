@@ -10,7 +10,7 @@ import argparse
 import textwrap
 import pandas as pd
 import zipfile
-import tarfile
+# import tarfile
 
 
 parser = argparse.ArgumentParser(description="This program validates GeneLab amplicon processed datasets. \
@@ -51,10 +51,10 @@ filtered_suffix = "_filtered.fastq.gz"
 filtered_R1_suffix = "_R1_filtered.fastq.gz"
 filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
-processing_tar_file = "processing_info.tar"
+processing_zip_file = "processing_info.zip"
 
 if args.output_prefix:
-    processing_tar_file = args.output_prefix + "processing_info.tar"
+    processing_zip_file = args.output_prefix + "processing_info.zip"
 
 expected_trimmed_outputs_or_suffixes = [str(args.output_prefix) + "cutadapt.log", str(args.output_prefix) + "trimmed-read-counts.tsv"]
 expected_filtered_outputs_or_suffixes = ["filtered-read-counts.tsv"]
@@ -78,7 +78,7 @@ def main():
 
     check_final_outputs()
 
-    check_for_processing_tar()
+    check_for_processing_zip()
 
     report_success()
 
@@ -332,13 +332,14 @@ def check_final_outputs():
         check_general_fasta_format(final_outputs_dir + fasta_file)
 
 
-def check_for_processing_tar():
-    """ this just makes sure a processing tar exists and at least has the Snakefile, as its contents can vary quite a bit """
+def check_for_processing_zip():
+    """ this just makes sure a processing zip exists and at least has the Snakefile, as its contents can vary quite a bit """
 
-    check_for_file_and_contents(processing_tar_file)
+    check_for_file_and_contents(processing_zip_file)
 
-    with tarfile.open(processing_tar_file) as tar_obj:
-        entries = tar_obj.getnames()
+    with zipfile.ZipFile(processing_zip_file) as zip_obj:
+
+        entries = zip_obj.namelist()
 
     target_substring = str(args.output_prefix).rstrip("-") + "/Snakefile"
 
@@ -348,8 +349,27 @@ def check_for_processing_tar():
 
         if not any(base_target.lower() in string.lower() for string in entries):
     
-            report_failure("The '" + processing_tar_file + "' does not have a 'Snakefile' as expected.")
+            report_failure("The '" + processing_zip_file + "' does not have a 'Snakefile' as expected.")
+
+
+# def check_for_processing_tar():
+#     """ this just makes sure a processing tar exists and at least has the Snakefile, as its contents can vary quite a bit """
+
+#     check_for_file_and_contents(processing_tar_file)
+
+#     with tarfile.open(processing_tar_file) as tar_obj:
+
+#         entries = tar_obj.getnames()
+
+#     target_substring = str(args.output_prefix).rstrip("-") + "/Snakefile"
+
+#     base_target = "/Snakefile"
+
+#     if not any(target_substring.lower() in string.lower() for string in entries):
+
+#         if not any(base_target.lower() in string.lower() for string in entries):
+    
+#             report_failure("The '" + processing_tar_file + "' does not have a 'Snakefile' as expected.")
 
 if __name__ == "__main__":
     main()
-
