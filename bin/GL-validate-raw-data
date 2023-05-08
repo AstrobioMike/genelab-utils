@@ -29,6 +29,7 @@ required.add_argument("-n", "--number-of-samples", help = "The expected number o
 parser.add_argument("-m", "--md5-file", help = "Include a file holding all md5sum results if avaiable (one will be created if not, or if the filenames are changed)", \
                     action = "store", default = "")
 parser.add_argument("-s", "--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
+parser.add_argument("--ATACseq", help = "Add this flag if the data are ATACseq (in which case R3 is expected to be the reverse read, and R2 holds barcodes)", action = "store_true")
 parser.add_argument("-k", "--keep-fastqc-files", help = "Add this flag if wanting to keep individual-sample fastqc files", action = "store_true")
 parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
 
@@ -46,13 +47,17 @@ standard_GL_R1_suffix = "_R1_raw.fastq.gz"
 standard_GL_R2_suffix = "_R2_raw.fastq.gz"
 standard_GL_SE_suffix = "_raw.fastq.gz"
 
+# additional ones for ATACseq
+R3_designations = ["_R3_", "_R3."]
+standard_GL_R3_suffix = "_R3_raw.fastq.gz"
+
 md5_output_file = "raw_md5sum.txt"
 md5_check_output_file = str(args.GLDS_ID) + "-raw-md5-check-results.txt"
 fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
 multiqc_output_prefix = "raw_multiqc"
 multiqc_data_dir = multiqc_output_prefix + "_data"
-multiqc_html = multiqc_output_prefix + ".html"
-multiqc_dir = multiqc_output_prefix + "_report"
+multiqc_html = multiqc_output_prefix + "_report.html"
+# multiqc_dir = multiqc_output_prefix + "_report"
 
 versions_used_file = str(args.GLDS_ID) + "-raw-validation-tool-versions.txt"
 
@@ -71,6 +76,11 @@ if args.slurm:
 
 def main():
 
+    # checking that single-end and ATACseq aren't specified together, as they are mutually exclusive
+    if args.single_ended and args.ATACseq:
+
+        print_notification("Arguments '--single-ended' and '--ATACseq' can't both be specified. Exiting for now.")
+        sys.exit(1)
 
     if args.slurm:
 
@@ -124,12 +134,15 @@ def main():
         out_tab = out_tab.rename(columns = {'index': 'unique_ID'})
         out_tab.to_csv(output_table_filename, sep = "\t", index = False)
 
+        # zipping up multiqc data dir
+        zip_multiqc_data_dir()
 
-        # making directory for multiqc outputs and zipping
-        package_and_zip_multiqc_outputs()
+        # # making directory for multiqc outputs and zipping
+        # package_and_zip_multiqc_outputs()
 
-        # making md5 for zipped qc dir and adding to md5s file
-        gen_and_add_multiqc_zip_md5()
+        # making md5 for zipped qc dir and html and adding to md5s file
+        # gen_and_add_multiqc_zip_md5()
+        gen_and_add_multiqc_md5s()
 
         # finish message
         finish_message(problem_files_list)
@@ -188,18 +201,27 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
     num_files = len(gz_files)
 
     # checking the expected number of files were detected
-    if not args.single_ended:
-
-        if num_files != args.number_of_samples * 2:
-            report_failure("We expected " + str(args.number_of_samples * 2) + " read files, but " + str(num_files) + " were detected.")
-    else:
+    # for single-end
+    if args.single_ended:
 
         if num_files != args.number_of_samples:
             report_failure("We expected " + str(args.number_of_samples) + " read files, but " + str(num_files) + " were detected.")
 
+    # for ATACseq
+    elif args.ATACseq:
 
-    # making sure they have the expected R1/R2 designations if paired-end data
-    if not args.single_ended:
+        if num_files != args.number_of_samples * 3 and num_files != args.number_of_samples * 4:
+            report_failure("We expected " + str(args.number_of_samples * 3) + " or " + str(args.number_of_samples * 4) + " read files, but " + str(num_files) + " were detected.")
+
+    # for typical paired-end
+    else:
+
+        if num_files != args.number_of_samples * 2:
+            report_failure("We expected " + str(args.number_of_samples * 2) + " read files, but " + str(num_files) + " were detected.")
+
+
+    # making sure they have the expected R1/R2 designations if typical paired-end data
+    if not args.single_ended and not args.ATACseq:
 
         forward_read_files_list = [file for file in gz_files if any(designation in file for designation in R1_designations)]
         reverse_read_files_list = [file for file in gz_files if any(designation in file for designation in R2_designations)]
@@ -216,8 +238,7 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
             report_failure("We expected " + str(args.number_of_samples) + " reverse read files, but " + str(num_forward_read_files) + " were found based on currently allowed read-pair designations (e.g. these formats: " + ', '.join(R2_designations) + "). If it's not clear what the problem is here, share this use-case with Mike so we can expand functionality if needed")
 
 
-    # making a dictionary with unique IDs as keys and a list of read files as values
-    if not args.single_ended:
+    # making a dictionary with unique IDs as keys and a list of read files as values if typical paired-end data
 
         # finding which read-pair designation we are using here (these are set in a list at top of script if wanting to add more)
         # putting a check that only one is found (one mechanism to hopefully prevent if these patterns are just part of a 
@@ -232,7 +253,6 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
                 R1_designation = designation
                 num_forward_designations_found += 1
 
-        num_reverse_designations_found = 0
         for designation in R2_designations:
 
             if designation in reverse_read_files_list[0]:
@@ -265,7 +285,7 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
 
 
     # now the case if single-end data
-    else:
+    elif args.single_ended:
 
         # find out which fq/fastq extension is being used here so we can get unique names prior to that (or to be able to rename in our convention if needed)
         # making sure not more than one is detected
@@ -293,6 +313,90 @@ def check_files_and_gen_unique_ID_to_file_map(expected_count):
 
         return(map_dict)
 
+    # now the case if ATACseq
+    elif args.ATACseq:
+
+        # making sure they have the expected R1/R2/R3
+        R1_read_files_list = [file for file in gz_files if any(designation in file for designation in R1_designations)]
+        R2_read_files_list = [file for file in gz_files if any(designation in file for designation in R2_designations)]
+        R3_read_files_list = [file for file in gz_files if any(designation in file for designation in R3_designations)]
+
+        num_R1_read_files = len(R1_read_files_list)
+        num_R2_read_files = len(R2_read_files_list)
+        num_R3_read_files = len(R3_read_files_list)
+
+        if args.number_of_samples != num_R1_read_files:
+
+            report_failure("We expected " + str(args.number_of_samples) + " R1 read files, but " + str(num_R1_read_files) + " were found based on currently allowed read-pair designations (e.g. these formats: " + ', '.join(R1_designations) + "). If it's not clear what the problem is here, share this use-case with Mike so we can expand functionality if needed.")
+
+        if args.number_of_samples != num_R2_read_files:
+
+            report_failure("We expected " + str(args.number_of_samples) + " R2 read files, but " + str(num_R2_read_files) + " were found based on currently allowed read-pair designations (e.g. these formats: " + ', '.join(R2_designations) + "). If it's not clear what the problem is here, share this use-case with Mike so we can expand functionality if needed.")
+
+        if args.number_of_samples != num_R3_read_files:
+
+            report_failure("We expected " + str(args.number_of_samples) + " R3 read files, but " + str(num_R3_read_files) + " were found based on currently allowed read-pair designations (e.g. these formats: " + ', '.join(R3_designations) + "). If it's not clear what the problem is here, share this use-case with Mike so we can expand functionality if needed.")
+
+        # making a dictionary with unique IDs as keys and a list of read files as values if typical paired-end data
+
+        # finding which read-pair designation we are using here (these are set in a list at top of script if wanting to add more)
+        # putting a check that only one is found (one mechanism to hopefully prevent if these patterns are just part of a 
+        # sample name, and not a read-pair designation)
+
+        num_R1_designations_found = 0
+        num_R2_designations_found = 0
+        num_R3_designations_found = 0
+
+        for designation in R1_designations:
+
+            if designation in R1_read_files_list[0]:
+                R1_designation = designation
+                num_R1_designations_found += 1
+
+        for designation in R2_designations:
+
+            if designation in R2_read_files_list[0]:
+                R2_designation = designation
+                num_R2_designations_found += 1
+
+        for designation in R3_designations:
+
+            if designation in R3_read_files_list[0]:
+                R3_designation = designation
+                num_R3_designations_found += 1
+
+        if num_R1_designations_found != 1 or num_R2_designations_found != 1 or num_R3_designations_found != 1:
+            report_failure("We're having trouble delineating R1, R2, and R3 read files based on the currently allowed formats (e.g., formatted like this: " + ', '.join(R1_designations) + "). Share this use-case with Mike to expand functionality if needed.")
+
+
+        # making dictionary with unique IDs as keys and list of read-files as values
+        map_dict = {}
+        for file in R1_read_files_list:
+
+            # getting unique portion of names prior to _R?_ designation
+            target_string_pattern = R1_designation + ".*$"
+            unique_ID = re.sub(target_string_pattern, "", file)
+
+            map_dict[unique_ID] = [file]
+
+        for file in R2_read_files_list:
+
+            # getting unique portion of names prior to _R?_ designation
+            target_string_pattern = R2_designation + ".*$"
+            unique_ID = re.sub(target_string_pattern, "", file)
+
+            map_dict[unique_ID].append(file)
+
+        for file in R3_read_files_list:
+
+            # getting unique portion of names prior to _R?_ designation
+            target_string_pattern = R3_designation + ".*$"
+            unique_ID = re.sub(target_string_pattern, "", file)
+
+            map_dict[unique_ID].append(file)
+
+        return(map_dict)
+
 
 def start_validation_output_table(map_dict):
     """ starts output table and adds unique IDs and file names """
@@ -308,13 +412,22 @@ def start_validation_output_table(map_dict):
     out_tab = pd.DataFrame.from_dict(files_count_dict, orient = "index", columns = ['num_read_files'])
 
     # adding info on original file names
-    if not args.single_ended:
+    # for typical paired-end case
+    if not args.single_ended and not args.ATACseq:
 
         new_tab = pd.DataFrame.from_dict(map_dict, orient = "index", columns = ['orig_R1_filename', 'orig_R2_filename'])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
-    else:
+    # for single-end case
+    elif args.single_ended:
+
         new_tab = pd.DataFrame.from_dict(map_dict, orient = "index", columns = ['orig_read_filename'])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+    # for ATACseq case
+    elif args.ATACseq:
+
+        new_tab = pd.DataFrame.from_dict(map_dict, orient = "index", columns = ['orig_R1_filename', 'orig_R2_filename', 'orig_R3_filename'])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
     return(out_tab)
@@ -334,7 +447,8 @@ def rename_files(map_dict, out_tab):
     # dictionary of renamed files (or not), for output table summary
     renamed_map_dict = {}
 
-    if not args.single_ended:
+    # case for typical paired-end
+    if not args.single_ended and not args.ATACseq:
 
         for key in map_dict.keys():
 
@@ -372,7 +486,63 @@ def rename_files(map_dict, out_tab):
         new_tab = pd.DataFrame.from_dict(renamed_map_dict, orient = "index", columns = ["new_R1_filename", "new_R2_filename"])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
-    else:
+
+    # case for ATACseq
+    elif args.ATACseq:
+
+        for key in map_dict.keys():
+
+            R1_orig_name = map_dict[key][0]
+            R2_orig_name = map_dict[key][1]
+            R3_orig_name = map_dict[key][2]
+
+            # only renaming if they don't fit our convention
+            if not R1_orig_name.endswith(standard_GL_R1_suffix):
+
+                files_renamed = True
+
+                R1_new_name = str(key) + str(standard_GL_R1_suffix)
+                os.rename(R1_orig_name, R1_new_name)
+                current_map_dict[key] = [R1_new_name]
+                renamed_map_dict[key] = [R1_new_name]
+
+            else:
+                current_map_dict[key] = [R1_orig_name]
+                renamed_map_dict[key] = ["not-renamed"]
+
+            if not R2_orig_name.endswith(standard_GL_R2_suffix):
+
+                files_renamed = True
+
+                R2_new_name = str(key) + str(standard_GL_R2_suffix)
+                os.rename(R2_orig_name, R2_new_name)
+                current_map_dict[key].append(R2_new_name)
+                renamed_map_dict[key].append(R2_new_name)
+
+            else:
+                current_map_dict[key].append(R2_orig_name)
+                renamed_map_dict[key].append("not-renamed")
+
+            if not R3_orig_name.endswith(standard_GL_R3_suffix):
+
+                files_renamed = True
+
+                R3_new_name = str(key) + str(standard_GL_R3_suffix)
+                os.rename(R3_orig_name, R3_new_name)
+                current_map_dict[key].append(R3_new_name)
+                renamed_map_dict[key].append(R3_new_name)
+
+
+            else:
+                current_map_dict[key].append(R3_orig_name)
+                renamed_map_dict[key].append("not-renamed")
+
+        # adding new names to output table
+        new_tab = pd.DataFrame.from_dict(renamed_map_dict, orient = "index", columns = ["new_R1_filename", "new_R2_filename", "new_R3_filename"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+    # case for single-end
+    elif args.single_ended:
 
         for key in map_dict.keys():
 
@@ -408,7 +578,8 @@ def check_gzip_integrity(map_dict, out_tab):
     # making list of problematic files
     problem_files_list = []
 
-    if not args.single_ended:
+    # case for typical paired-end
+    if not args.single_ended and not args.ATACseq:
 
         for key in map_dict.keys():
 
@@ -437,8 +608,47 @@ def check_gzip_integrity(map_dict, out_tab):
         new_tab = pd.DataFrame.from_dict(gzip_test_dict, orient = "index", columns = ["R1_gzip_test", "R2_gzip_test"])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
-    # now handling single end
-    else:
+    # case if ATACseq
+    elif args.ATACseq:
+
+        for key in map_dict.keys():
+
+            R1_read_file = map_dict[key][0]
+            R2_read_file = map_dict[key][1]
+            R3_read_file = map_dict[key][2]
+
+            R1_gzip_test_out = subprocess.run(['gzip', '-t', R1_read_file], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+            R2_gzip_test_out = subprocess.run(['gzip', '-t', R2_read_file], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+            R3_gzip_test_out = subprocess.run(['gzip', '-t', R3_read_file], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+
+            if R1_gzip_test_out.returncode != 0:
+                R1_gzip_test_result = "FAIL"
+                problem_files_list.append(R1_read_file)
+            else:
+                R1_gzip_test_result = "PASS"
+
+            if R2_gzip_test_out.returncode != 0:
+                R2_gzip_test_result = "FAIL"
+                problem_files_list.append(R2_read_file)
+            else:
+                R2_gzip_test_result = "PASS"
+
+            if R3_gzip_test_out.returncode != 0:
+                R3_gzip_test_result = "FAIL"
+                problem_files_list.append(R3_read_file)
+            else:
+                R3_gzip_test_result = "PASS"
+
+            gzip_test_dict[key] = [R1_gzip_test_result]
+            gzip_test_dict[key].append(R2_gzip_test_result)
+            gzip_test_dict[key].append(R3_gzip_test_result)
+
+        ## adding results to output summary table
+        new_tab = pd.DataFrame.from_dict(gzip_test_dict, orient = "index", columns = ["R1_gzip_test", "R2_gzip_test", "R3_gzip_test"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+    # case if single-end
+    elif args.single_ended:
 
         for key in map_dict.keys():
 
@@ -474,11 +684,6 @@ def check_md5s(map_dict, out_tab):
 
     md5_check_out = subprocess.run([md5_check_command], shell = True, stderr = subprocess.PIPE)
 
-    # # checking if there was any problem
-    # if md5_check_out.returncode != 0:
-
-    #     print("PROBLEM")
-
     # reading in md5sum check results
     md5_check_results_df = pd.read_csv(md5_check_output_file, sep = ": ", names = ["filename", "status"], engine = "python")
     md5_check_results_df.set_index('filename', inplace = True)
@@ -486,7 +691,8 @@ def check_md5s(map_dict, out_tab):
     # getting md5 values into dictionary with our map_dict keys
     md5_dict = {}
 
-    if not args.single_ended:
+    # case for typical paired-end
+    if not args.single_ended and not args.ATACseq:
 
         for key in map_dict.keys():
 
@@ -519,12 +725,61 @@ def check_md5s(map_dict, out_tab):
             else:
                 md5_dict[key].append(reverse_file_md5)
 
-
         # putting into table to be combined with output summary table later
         md5_df = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["R1_md5_check", "R2_md5_check", "R1_md5", "R2_md5"])
 
-    # if single-ended
-    else:
+    # case for ATACseq
+    elif args.ATACseq:
+
+        for key in map_dict.keys():
+
+            R1_read_file = map_dict[key][0]
+            R2_read_file = map_dict[key][1]
+            R3_read_file = map_dict[key][1]
+
+            R1_file_result = md5_check_results_df.loc[R1_read_file].status
+            R2_file_result = md5_check_results_df.loc[R2_read_file].status
+            R3_file_result = md5_check_results_df.loc[R3_read_file].status
+
+            R1_file_md5 = md5_in_df.loc[R1_read_file].md5
+            R2_file_md5 = md5_in_df.loc[R2_read_file].md5
+            R3_file_md5 = md5_in_df.loc[R3_read_file].md5
+
+            if R1_file_result == "FAILED":
+                md5_dict[key] = ["FAIL"]
+            else:
+                md5_dict[key] = ["PASS"]
+
+            if R2_file_result == "FAILED":
+                md5_dict[key].append("FAIL")
+            else:
+                md5_dict[key].append("PASS")
+
+            if R3_file_result == "FAILED":
+                md5_dict[key].append("FAIL")
+            else:
+                md5_dict[key].append("PASS")
+
+            if R1_file_result == "FAILED":
+                md5_dict[key].append("failed-md5-check")
+            else:
+                md5_dict[key].append(R1_file_md5)
+
+            if R2_file_result == "FAILED":
+                md5_dict[key].append("failed-md5-check")
+            else:
+                md5_dict[key].append(R2_file_md5)
+
+            if R3_file_result == "FAILED":
+                md5_dict[key].append("failed-md5-check")
+            else:
+                md5_dict[key].append(R3_file_md5)
+
+        # putting into table to be combined with output summary table later
+        md5_df = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["R1_md5_check", "R2_md5_check", "R3_md5_check", "R1_md5", "R2_md5", "R3_md5"])
+
+    # case for single-ended
+    elif args.single_ended:
 
         for key in map_dict.keys():
 
@@ -554,7 +809,8 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
     # making dictionary holding md5 values
     md5_dict = {}
 
-    if not args.single_ended:
+    # case for typical paired-end
+    if not args.single_ended and not args.ATACseq:
 
         for key in map_dict.keys():
 
@@ -607,7 +863,82 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
                     reverse_file_md5 = md5_dict[key][1]
                     md5_out_file.write(str(reverse_file_md5) + "  " + str(reverse_read_file) + "\n")
 
-    else:
+
+    # case for ATACseq
+    elif args.ATACseq:
+
+        for key in map_dict.keys():
+
+            R1_read_file = map_dict[key][0]
+            R2_read_file = map_dict[key][1]
+            R3_read_file = map_dict[key][2]
+
+            # only running if file passed the gzip test
+            if R1_read_file not in problem_files_list:
+
+                R1_md5_out = subprocess.run(['md5sum', R1_read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+    
+                # getting rid of filename (these come like this '3s9ckfjie  file.txt' from command-line md5sum program)
+                R1_md5_out = re.sub(" .*$", "", R1_md5_out).strip()
+                md5_dict[key] = [R1_md5_out]
+
+            else:
+                md5_dict[key] = ["failed-gzip-test"]
+
+
+            if R2_read_file not in problem_files_list:
+
+                R2_md5_out = subprocess.run(['md5sum', R2_read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+                R2_md5_out = re.sub(" .*$", "", R2_md5_out).strip()
+                md5_dict[key].append(R2_md5_out)
+
+            else:
+
+                md5_dict[key].append("failed-gzip-test")
+
+
+            if R3_read_file not in problem_files_list:
+
+                R3_md5_out = subprocess.run(['md5sum', R3_read_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+                R3_md5_out = re.sub(" .*$", "", R3_md5_out).strip()
+                md5_dict[key].append(R3_md5_out)
+
+            else:
+
+                md5_dict[key].append("failed-gzip-test")
+
+
+        # adding md5 values to output table
+        new_tab = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["R1_md5", "R2_md5", "R3_md5"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+        # writing out md5 file (only including those that are not problematic)
+        with open(md5_output_file, "w") as md5_out_file:
+            
+            for key in map_dict.keys():
+                
+                R1_read_file = map_dict[key][0]
+                R2_read_file = map_dict[key][1]
+                R3_read_file = map_dict[key][2]
+
+                if R1_read_file not in problem_files_list:
+
+                    R1_file_md5 = md5_dict[key][0]
+                    md5_out_file.write(str(R1_file_md5) + "  " + str(R1_read_file) + "\n")
+
+                if R2_read_file not in problem_files_list:
+
+                    R2_file_md5 = md5_dict[key][1]
+                    md5_out_file.write(str(R2_file_md5) + "  " + str(R2_read_file) + "\n")
+
+                if R3_read_file not in problem_files_list:
+
+                    R3_file_md5 = md5_dict[key][2]
+                    md5_out_file.write(str(R3_file_md5) + "  " + str(R3_read_file) + "\n")
+
+
+    # case for single-end
+    elif args.single_ended:
 
         for key in map_dict.keys():
 
@@ -655,8 +986,8 @@ def write_new_md5s_file(map_dict, md5_df, problem_files_list, files_renamed):
 
     md5_dict = {}
 
-    # if paired-end
-    if not args.single_ended:
+    # case if paired-end
+    if not args.single_ended and not args.ATACseq:
 
         with open(md5_output_file, "w") as md5_out_file:
 
@@ -676,9 +1007,35 @@ def write_new_md5s_file(map_dict, md5_df, problem_files_list, files_renamed):
                     reverse_file_md5 = md5_df.loc[key].R2_md5
                     md5_out_file.write(str(reverse_file_md5) + "  " + str(reverse_read_file) + "\n")
 
+    # case if ATACseq
+    elif args.ATACseq:
 
-    # if single-end
-    else:
+        with open(md5_output_file, "w") as md5_out_file:
+
+            for key in map_dict.keys():
+
+                R1_read_file = map_dict[key][0]
+                R2_read_file = map_dict[key][1]
+                R3_read_file = map_dict[key][2]
+
+                # only writing out if they passed the gzip test
+                if R1_read_file not in problem_files_list:
+
+                    R1_file_md5 = md5_df.loc[key].R1_md5
+                    md5_out_file.write(str(R1_file_md5) + "  " + str(R1_read_file) + "\n")
+
+                if R2_read_file not in problem_files_list:
+
+                    R2_file_md5 = md5_df.loc[key].R2_md5
+                    md5_out_file.write(str(R2_file_md5) + "  " + str(R2_read_file) + "\n")
+
+                if R3_read_file not in problem_files_list:
+
+                    R3_file_md5 = md5_df.loc[key].R3_md5
+                    md5_out_file.write(str(R3_file_md5) + "  " + str(R3_read_file) + "\n")
+
+    # case if single-end
+    elif args.single_ended:
 
         with open(md5_output_file, "w") as md5_out_file:
 
@@ -731,7 +1088,7 @@ def run_fastqc_and_multiqc(map_dict, problem_files_list):
     with open(log_out, "a") as log:
         log.write("\n\n    " + str(multiqc_version).strip() + " log:\n\n")
 
-    multiqc_command = "multiqc ./ --force --filename " + str(multiqc_output_prefix) + " >> " + str(log_out) + " 2>&1"
+    multiqc_command = "multiqc ./ --force --cl-config 'max_table_rows: 99999999' --interactive --filename " + str(multiqc_output_prefix) + " >> " + str(log_out) + " 2>&1"
 
     subprocess.run([multiqc_command], shell = True)
 
@@ -767,7 +1124,8 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
     # making dictionary of counts, length ranges, average lengths, and number of fastqc files present in the multiqc report
     counts_dict, length_range_dict, avg_length_dict, fastqc_files_count = {}, {}, {}, {}
 
-    if not args.single_ended:
+    # case for typical paired-end
+    if not args.single_ended and not args.ATACseq:
 
         for key in map_dict.keys():
 
@@ -861,10 +1219,132 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
         new_tab = pd.DataFrame.from_dict(fastqc_files_count, orient = "index", columns = ["num_fastqc_reports_in_multiqc_report"])
         out_tab = pd.concat([out_tab, new_tab], axis = 1)
 
+    # case for typical paired-end
+    elif args.ATACseq:
+
+        for key in map_dict.keys():
+
+            # doing R1, only getting info if the file passed the gzip test
+            if map_dict[key][0] not in problem_files_list:
+
+                R1_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][0])
+
+                num_R1_reads = round(multiqc_general_stats_df.loc[R1_read_multiqc_ID, 'counts'])
+                R1_read_length_range = multiqc_fastqc_df.loc[R1_read_multiqc_ID, 'length_range']
+                R1_avg_read_length = multiqc_fastqc_df.loc[R1_read_multiqc_ID, 'avg_length']
+
+                counts_dict[key] = [num_R1_reads]
+                length_range_dict[key] = [R1_read_length_range]
+                avg_length_dict[key] = [R1_avg_read_length]
+
+                fastqc_files_count[key] = 1
+
+            else: 
+
+                num_R1_reads = "R1-failed-gzip-test"
+                counts_dict[key] = ["failed-gzip-test"]
+                length_range_dict[key] = ["failed-gzip-test"]
+                avg_length_dict[key] = ["failed-gzip-test"]
+
+                R1_avg_read_length = "R1-failed-gzip-test"
+                R1_read_length_range = "R1-failed-gzip-test"
+
+                fastqc_files_count[key] = 0
 
 
-    # handling if single-end
-    else:
+            # doing R2, only getting info if the file passed the gzip test
+            if map_dict[key][1] not in problem_files_list:
+
+                R2_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][1])
+
+                num_R2_reads = round(multiqc_general_stats_df.loc[R2_read_multiqc_ID, 'counts'])
+                R2_read_length_range = multiqc_fastqc_df.loc[R2_read_multiqc_ID, 'length_range']
+                R2_avg_read_length = multiqc_fastqc_df.loc[R2_read_multiqc_ID, 'avg_length']
+
+                counts_dict[key].append(num_R2_reads)
+                length_range_dict[key].append(R2_read_length_range)
+                avg_length_dict[key].append(R2_avg_read_length)
+
+                fastqc_files_count[key] += 1
+
+            else:
+
+                num_R2_reads = "R2-failed-gzip-test"
+                counts_dict[key].append("failed-gzip-test")
+                length_range_dict[key].append("failed-gzip-test")
+                avg_length_dict[key].append("failed-gzip-test")
+
+                R2_avg_read_length = "R2-failed-gzip-test"
+                R2_read_length_range = "R2-failed-gzip-test"
+
+                fastqc_files_count[key] += 0
+
+            # doing R3, only getting info if the file passed the gzip test
+            if map_dict[key][2] not in problem_files_list:
+
+                R3_read_multiqc_ID = re.sub(".fastq.gz", "", map_dict[key][2])
+
+                num_R3_reads = round(multiqc_general_stats_df.loc[R3_read_multiqc_ID, 'counts'])
+                R3_read_length_range = multiqc_fastqc_df.loc[R3_read_multiqc_ID, 'length_range']
+                R3_avg_read_length = multiqc_fastqc_df.loc[R3_read_multiqc_ID, 'avg_length']
+
+                counts_dict[key].append(num_R3_reads)
+                length_range_dict[key].append(R3_read_length_range)
+                avg_length_dict[key].append(R3_avg_read_length)
+
+                fastqc_files_count[key] += 1
+
+            else:
+
+                num_R3_reads = "R3-failed-gzip-test"
+                counts_dict[key].append("failed-gzip-test")
+                length_range_dict[key].append("failed-gzip-test")
+                avg_length_dict[key].append("failed-gzip-test")
+
+                R3_avg_read_length = "R3-failed-gzip-test"
+                R3_read_length_range = "R3-failed-gzip-test"
+
+                fastqc_files_count[key] += 0
+
+
+            # adding value for if counts are equal in R1, R2, and R3 for ATACseq
+            if num_R1_reads == num_R2_reads and num_R1_reads == num_R3_reads:
+
+                counts_dict[key].append("YES")
+
+            else:
+
+                counts_dict[key].append("NO")
+
+            # adding value for if read lengths are equal in R1 and R3 for ATACseq
+            if R1_read_length_range == R3_read_length_range and R1_avg_read_length == R3_avg_read_length:
+
+                avg_length_dict[key].append("YES")
+
+            else:
+
+                avg_length_dict[key].append("NO")
+
+
+        # adding read counts to output table
+        new_tab = pd.DataFrame.from_dict(counts_dict, orient = "index", columns = ["R1_num_reads", "R2_num_reads", "R3_num_reads", "R1_R2_and_R3_num_reads_equal"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+        # adding read length ranges to output table
+        new_tab = pd.DataFrame.from_dict(length_range_dict, orient = "index", columns = ["R1_read_length_range", "R2_read_length_range", "R3_read_length_range"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+        # adding read avg lengths to output table
+        new_tab = pd.DataFrame.from_dict(avg_length_dict, orient = "index", columns = ["R1_avg_read_length", "R2_avg_read_length", "R3_avg_read_length", "R1_and_R3_read_lengths_equal"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+        # adding num fastqc files in multiqc report
+        new_tab = pd.DataFrame.from_dict(fastqc_files_count, orient = "index", columns = ["num_fastqc_reports_in_multiqc_report"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+
+    # case if single-end
+    elif args.single_ended:
 
         for key in map_dict.keys():
 
@@ -912,32 +1392,57 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
     return(out_tab)
 
 
-def package_and_zip_multiqc_outputs():
-    """ moves multiqc outputs into their own dir and zips it """
-
-    try:
-        os.mkdir(multiqc_dir)
-    except:
-        pass
-
-    shutil.move(multiqc_data_dir, multiqc_dir)
-    shutil.move(multiqc_html, multiqc_dir)
+def zip_multiqc_data_dir():
+    """ zips up multiqc data dir """
 
     # zipping multiqc dir
-    zip_command = "zip -q -m -r " + str(multiqc_dir) + ".zip " + str(multiqc_dir)
+    zip_command = "zip -q -m -r " + str(multiqc_data_dir) + ".zip " + str(multiqc_data_dir)
 
     subprocess.run([zip_command], shell = True)
 
+    # renaming output html
+    shutil.move(str(multiqc_output_prefix) + ".html", multiqc_html)
 
-def gen_and_add_multiqc_zip_md5():
-    """ generates and adds multiqc zip md5 to md5 file """
 
-    zip_file = str(multiqc_dir) + ".zip"
+# def package_and_zip_multiqc_outputs():
+#     """ moves multiqc outputs into their own dir and zips it """
+
+#     try:
+#         os.mkdir(multiqc_dir)
+#     except:
+#         pass
+
+#     shutil.move(multiqc_data_dir, multiqc_dir)
+#     shutil.move(multiqc_html, multiqc_dir)
+
+#     # zipping multiqc dir
+#     zip_command = "zip -q -m -r " + str(multiqc_dir) + ".zip " + str(multiqc_dir)
+
+#     subprocess.run([zip_command], shell = True)
+
+
+def gen_and_add_multiqc_md5s():
+    """ generates and adds multiqc md5s to md5 file """
+
+    zip_file = str(multiqc_data_dir) + ".zip"
     zip_md5_out = subprocess.run(['md5sum', zip_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+
+    html_md5_out = subprocess.run(['md5sum', multiqc_html], stdout = subprocess.PIPE).stdout.decode('utf-8')
 
     with open(md5_output_file, "a") as out_file:
 
         out_file.write(zip_md5_out)
+        out_file.write(html_md5_out)
+
+# def gen_and_add_multiqc_zip_md5():
+#     """ generates and adds multiqc zip md5 to md5 file """
+
+#     zip_file = str(multiqc_dir) + ".zip"
+#     zip_md5_out = subprocess.run(['md5sum', zip_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+
+#     with open(md5_output_file, "a") as out_file:
+
+#         out_file.write(zip_md5_out)
 
 
 def finish_message(problem_files_list):
