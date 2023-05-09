@@ -56,8 +56,9 @@ md5_check_output_file = str(args.GLDS_ID) + "-raw-md5-check-results.txt"
 fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
 multiqc_output_prefix = "raw_multiqc"
 multiqc_data_dir = multiqc_output_prefix + "_data"
-multiqc_html = multiqc_output_prefix + "_report.html"
-# multiqc_dir = multiqc_output_prefix + "_report"
+multiqc_html = multiqc_output_prefix + ".html"
+# multiqc_html = multiqc_output_prefix + "_report.html"
+multiqc_dir = multiqc_output_prefix + "_report"
 
 versions_used_file = str(args.GLDS_ID) + "-raw-validation-tool-versions.txt"
 
@@ -134,15 +135,15 @@ def main():
         out_tab = out_tab.rename(columns = {'index': 'unique_ID'})
         out_tab.to_csv(output_table_filename, sep = "\t", index = False)
 
-        # zipping up multiqc data dir
-        zip_multiqc_data_dir()
+        # # zipping up multiqc data dir
+        # zip_multiqc_data_dir()
 
-        # # making directory for multiqc outputs and zipping
-        # package_and_zip_multiqc_outputs()
+        # making directory for multiqc outputs and zipping
+        package_and_zip_multiqc_outputs()
 
-        # making md5 for zipped qc dir and html and adding to md5s file
-        # gen_and_add_multiqc_zip_md5()
-        gen_and_add_multiqc_md5s()
+        gen_and_add_multiqc_zip_md5()
+        # # making md5 for zipped qc dir and html and adding to md5s file
+        # gen_and_add_multiqc_md5s()
 
         # finish message
         finish_message(problem_files_list)
@@ -1392,57 +1393,57 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
     return(out_tab)
 
 
-def zip_multiqc_data_dir():
-    """ zips up multiqc data dir """
-
-    # zipping multiqc dir
-    zip_command = "zip -q -m -r " + str(multiqc_data_dir) + ".zip " + str(multiqc_data_dir)
-
-    subprocess.run([zip_command], shell = True)
-
-    # renaming output html
-    shutil.move(str(multiqc_output_prefix) + ".html", multiqc_html)
-
-
-# def package_and_zip_multiqc_outputs():
-#     """ moves multiqc outputs into their own dir and zips it """
-
-#     try:
-#         os.mkdir(multiqc_dir)
-#     except:
-#         pass
-
-#     shutil.move(multiqc_data_dir, multiqc_dir)
-#     shutil.move(multiqc_html, multiqc_dir)
+# def zip_multiqc_data_dir():
+#     """ zips up multiqc data dir """
 
 #     # zipping multiqc dir
-#     zip_command = "zip -q -m -r " + str(multiqc_dir) + ".zip " + str(multiqc_dir)
+#     zip_command = "zip -q -m -r " + str(multiqc_data_dir) + ".zip " + str(multiqc_data_dir)
 
 #     subprocess.run([zip_command], shell = True)
 
+#     # renaming output html
+#     shutil.move(str(multiqc_output_prefix) + ".html", multiqc_html)
 
-def gen_and_add_multiqc_md5s():
-    """ generates and adds multiqc md5s to md5 file """
 
-    zip_file = str(multiqc_data_dir) + ".zip"
-    zip_md5_out = subprocess.run(['md5sum', zip_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+def package_and_zip_multiqc_outputs():
+    """ moves multiqc outputs into their own dir and zips it """
 
-    html_md5_out = subprocess.run(['md5sum', multiqc_html], stdout = subprocess.PIPE).stdout.decode('utf-8')
+    try:
+        os.mkdir(multiqc_dir)
+    except:
+        pass
 
-    with open(md5_output_file, "a") as out_file:
+    shutil.move(multiqc_data_dir, multiqc_dir)
+    shutil.move(multiqc_html, multiqc_dir)
 
-        out_file.write(zip_md5_out)
-        out_file.write(html_md5_out)
+    # zipping multiqc dir
+    zip_command = "zip -q -m -r " + str(multiqc_dir) + ".zip " + str(multiqc_dir)
 
-# def gen_and_add_multiqc_zip_md5():
-#     """ generates and adds multiqc zip md5 to md5 file """
+    subprocess.run([zip_command], shell = True)
 
-#     zip_file = str(multiqc_dir) + ".zip"
+
+# def gen_and_add_multiqc_md5s():
+#     """ generates and adds multiqc md5s to md5 file """
+
+#     zip_file = str(multiqc_data_dir) + ".zip"
 #     zip_md5_out = subprocess.run(['md5sum', zip_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+
+#     html_md5_out = subprocess.run(['md5sum', multiqc_html], stdout = subprocess.PIPE).stdout.decode('utf-8')
 
 #     with open(md5_output_file, "a") as out_file:
 
 #         out_file.write(zip_md5_out)
+#         out_file.write(html_md5_out)
+
+def gen_and_add_multiqc_zip_md5():
+    """ generates and adds multiqc zip md5 to md5 file """
+
+    zip_file = str(multiqc_dir) + ".zip"
+    zip_md5_out = subprocess.run(['md5sum', zip_file], stdout = subprocess.PIPE).stdout.decode('utf-8')
+
+    with open(md5_output_file, "a") as out_file:
+
+        out_file.write(zip_md5_out)
 
 
 def finish_message(problem_files_list):
