@@ -15,13 +15,12 @@ from json import loads
 from urllib.request import urlopen
 import tempfile
 
-parser = argparse.ArgumentParser(description = "This is a program for downloading GLDS data files. For version info, run \
+parser = argparse.ArgumentParser(description = "This is a program for downloading GLDS data files. See options below for usage. For version info, run \
                                                 `GL-version`.",
-                                 epilog = "\033[0;33m\
-                                            NOTICE: Some confusion may arise due to recent changes. It is possible that \
+                                 epilog = "\033[0;33mNOTICE: Some confusion may arise due to recent changes. It is possible that \
                                             a GLDS ID and an OSD ID may not match up, e.g., 'OSD-561' (https://osdr.nasa.gov/bio/repo/data/studies/OSD-561) \
                                             holds 'GLDS-556' (which we can see at the very top, just under the image next to the title). Moving forward, \
-                                            IT IS RECOMMENDED to search for the OSD ID (which you can search for based on a given GLDS ID here: https://osdr.nasa.gov/bio/repo/search) – \
+                                            IT IS RECOMMENDED to search for the OSD ID (which you can search for based on a given GLDS ID here: https://osdr.nasa.gov/bio/repo/search) -\
                                             as that will find all the associated GLDS files no matter what their GLDS ID's are. E.g., 'GL-download-GLDS-data -g OSD-561 --print-only'. \
                                             Contact Mike Lee at Mike.Lee@nasa.gov if having trouble. \
                                             \
@@ -32,13 +31,15 @@ required = parser.add_argument_group('required arguments')
 required.add_argument("-g", "--OSD-or-GLDS-ID", help='OSD ID (e.g., "ODS-276") or GLDS ID (e.g. "GLDS-276"); be sure to read the NOTICE at the bottom of the help menu', 
                       action="store", required = True, type = str)
 
-required.add_argument("-p", "--pattern", help = "If we do not want to download all files (which we often won't), we can specify \
+parser.add_argument("-p", "--pattern", help = "If we do not want to download all files (which we often won't), we can specify \
                       a pattern here to subset the total files. For example, if we know we want to download just the fastq.gz \
                       files, we can say '-p fastq.gz'. We can also provide multiple patterns as a comma-separated list. For example, \
                       If we want to download the fastq.gz files that also have 'NxtaFlex', 'metagenomics', and 'raw' in their filenames, we can provide \
                       '-p fastq.gz,NxtaFlex,metagenomics,raw'. Looking through the *-file-info.tsv table produced by this program when run \
                       with the '--just-get-file-info-table' flag can help figure this out if needed. (Note that this is case-sensitive.)", action = "store", type = str)
 
+parser.add_argument("-a", "--assay-table", help = "Assay table from a given OSD ISA - if providing an assay table, all files from the 'Raw Data File' \
+                                                   column will be downloaded (incompatible with --pattern and --mode)", default = False, action = "store", type = str)
 
 parser.add_argument("-o", "--output-dir", help = "Directory to put downloaded files (default is current working directory)", default = ".", action = "store", type = str)
 
@@ -82,6 +83,16 @@ not_downloaded_files_file = str(OSD_acc) + "-files-targeted-but-not-downloaded.t
 
 def main():
 
+    # confirming if assay was provided, pattern nor mode were
+    if args.assay_table:
+
+        if args.pattern:
+
+            report_message("Providing an assay table is incompatible with option `--pattern` (`-p`).")
+            print("")
+            exit(1)
+
+
     if args.OSD_or_GLDS_ID.startswith("GLDS-"):
 
         confirm_continue_with_GLDS_search()
@@ -95,42 +106,44 @@ def main():
             print("")
             exit(1)
 
-
     # getting GLDS file-info into table
     report_message("Attempting to retrieve '" + args.OSD_or_GLDS_ID + "' file data from:")
     print("    " + GLDS_file_json_url + "\n")
     
-    gen_files_table(GLDS_file_json_url)
+    in_tab, num_total_files = gen_files_table(GLDS_file_json_url)
 
     # exiting if user just wants file-info table
     if args.just_get_file_info_table:
         exit()
-
-    # reading in file-info table
-    in_tab = pd.read_csv(GLDS_file_info_output_tab, sep = "\t")
-    
-    # number of total files
-    num_total_files = len(in_tab.index)
     
     # list of all files
     all_files = in_tab.filename.tolist()
 
-    report_message(f"The downloaded table holds a total of {num_total_files} files.")
-    print("")
-    sleep(1)
+    # divergence here if user provided an assay table, or is searching by a pattern
+    if args.assay_table:
 
-    # getting targets
-    target_files, num_files_to_download = get_targets(all_files, num_total_files)
+        # getting targets (wanted filenames from assay table)
+        target_files, num_files_to_download = get_targets_from_assay_table(all_files, num_total_files)
+
+        # checking wanted files from assay table are present in the available files from the specified OSD/GLDS 
+        target_files, num_files_to_download = check_assay_specified_files_are_available(all_files, target_files)
+
+    else:
+
+        # getting targets
+        target_files, num_files_to_download = get_targets(all_files, num_total_files)
 
     if args.print_only:
 
         print_target_files(target_files, num_files_to_download)
 
+
     if not args.force:
 
         confirm_download(num_files_to_download)
 
-    # creating output directory exists if specified and if needed
+
+    # creating output directory if specified and if needed
     if args.output_dir != ".":
 
         if not os.path.exists(args.output_dir):
@@ -217,10 +230,19 @@ def gen_files_table(files_info_url):
 
             out_file.write(f"{filename}\t{file_url}\n")
 
+    
+    # reading in file-info table
+    in_tab = pd.read_csv(GLDS_file_info_output_tab, sep = "\t")
+    
+    # getting number of total files
+    num_total_files = len(in_tab.index)
+
     # writing out file-info table
-    report_message("A table with available filenames and URLs has been written to:")
-    print("    " + GLDS_file_info_output_tab + "\n")
+    report_message(f"A table with an available {num_total_files} filenames and URLs has been written to:")
+    print("    " + GLDS_file_info_output_tab)
     sleep(1)
+
+    return(in_tab, num_total_files)
 
 
 def check_expected_files_were_downloaded(target_files, num_files_to_download, output_dir):
@@ -255,6 +277,85 @@ def check_expected_files_were_downloaded(target_files, num_files_to_download, ou
 
     report_message(f"The download commands executed were written to:")
     print(f"    {download_commands_file}\n")
+
+
+
+def get_targets_from_assay_table(all_files, num_total_files):
+
+    # reading in assay table
+    assay_tab = pd.read_csv(args.assay_table, sep = "\t")
+    
+    # getting 'Raw Data File' column
+    files_column_list = assay_tab['Raw Data File'].tolist()
+    
+    # iterating through and splitting if they have a comma in there (like if paired-end)
+    # and adding to target-files list
+    target_files = []
+
+    for entry in files_column_list:
+
+        if "," in entry:
+
+            target_files.extend(entry.split(","))
+
+        else:
+
+            target_files.append(entry)
+
+    num_files_to_download = len(target_files)
+        
+    if num_files_to_download == 0:
+
+        report_message(f"No files were found in the assay table. Did it have a 'Raw Data File' column?")
+        print("")
+        exit(0)
+
+    report_message(f"{num_files_to_download} file(s) were found in the provided assay table's 'Raw Data File' column.")
+    print("")
+    sleep(1)
+
+    return(target_files, num_files_to_download)
+
+def check_assay_specified_files_are_available(all_files, target_files):
+
+    """ 
+    checks if the files found in the user-provided assay table can
+    be found in the files available for download based on the user-specified OSD/GLDS
+    """
+
+    # getting which, if any, wanted files are not available
+    all_files_set = set(all_files)
+
+    files_not_found_list = [target for target in target_files if target not in all_files_set]
+
+    #  handling if none were found
+    if len(files_not_found_list) == len(target_files):
+
+        report_message(f"None of the files from the assay table were found in the files available for the specified {args.OSD_or_GLDS_ID}.", "red")
+        report_message(f"Are you sure you provided the correct OSD or GLDS accession associated with the input assay table?")
+        report_message(f"Exiting for now.")
+        print("")
+        exit(1)
+
+    # handling if some were found
+    if len(files_not_found_list) != 0:
+
+        num_target_files_found = len(target_files) - len(files_not_found_list)
+
+        report_message(f"{len(files_not_found_list)} of the {len(target_files)} target files found in the provided assay table were not found to be available from the specified {args.OSD_or_GLDS_ID}.", "red")
+        report_message(f"Here is an example of one of them:")
+        print(f"        {files_not_found_list[1]}\n")
+
+        report_message(f"We are proceeding with attempting to download the {num_target_files_found} target file(s) successfully found, but just noting because this is a little unexpected.")
+        print("")
+        sleep(1)
+
+        files_found_list = [target for target in target_files if target in all_files_set]
+
+    else:
+        files_found_list = target_files
+
+    return(files_found_list, len(files_found_list))
 
 
 def get_targets(all_files, num_total_files):
@@ -391,7 +492,7 @@ def print_target_files(target_files, num_files_to_download):
 
 def confirm_download(num_files_to_download):
 
-    report_message(f"If you'd just like to see a list of the file(s) that would be downloaded, here is your chance to exit and rerun the command with the '--print-only' flag...")
+    report_message(f"If you'd just like to see a list of the {num_files_to_download} file(s) that would be downloaded, here is your chance to exit and rerun the command with the '--print-only' flag...")
     sleep(1)
     print("")
 
@@ -417,7 +518,7 @@ def confirm_continue_with_GLDS_search():
 a GLDS ID and an OSD ID may not match up, e.g., 'OSD-561' (https://osdr.nasa.gov/bio/repo/data/studies/OSD-561) \
 holds 'GLDS-556' (we can see the GLDS ID at the very top of that page, just under the image next to the title).")
     report_message("Moving forward, IT IS RECOMMENDED to search for the OSD ID (which you can search for based on a given GLDS ID here: https://osdr.nasa.gov/bio/repo/search) \
-– as that will find all the associated GLDS files no matter what their GLDS ID's are. E.g., 'GL-download-GLDS-data -g OSD-561 --print-only'.")
+- as that will find all the associated GLDS files no matter what their GLDS ID's are. E.g., 'GL-download-GLDS-data -g OSD-561 --print-only'.")
     report_message("This is only a notice, and you are free to move forward with searching by GLDS ID, but be sure to check visually against the \
 appropriate repository page that you are getting all the desired files, and consider using the OSD ID instead :)")
     report_message("Contact Mike Lee at Mike.Lee@nasa.gov if having trouble.")
