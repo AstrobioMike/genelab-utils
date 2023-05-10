@@ -344,7 +344,7 @@ def check_assay_specified_files_are_available(all_files, target_files):
 
         report_message(f"{len(files_not_found_list)} of the {len(target_files)} target files found in the provided assay table were not found to be available from the specified {args.OSD_or_GLDS_ID}.", "red")
         report_message(f"Here is an example of one of them:")
-        print(f"        {files_not_found_list[1]}\n")
+        print(f"        {files_not_found_list[0]}\n")
 
         report_message(f"We are proceeding with attempting to download the {num_target_files_found} target file(s) successfully found, but just noting because this is a little unexpected.")
         print("")
