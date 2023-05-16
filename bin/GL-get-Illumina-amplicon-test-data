@@ -2,22 +2,37 @@
 
 if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
     printf "\n  Downloads paired-end Illumina amplicon data for two test samples (~300 KB total) from:\n"
-    printf "      https://figshare.com/articles/dataset/Illumina_amplicon_test_data/16725424\n\n"
+    printf "      https://zenodo.org/record/7939241#.ZGLaAexlDdI\n\n"    
+#    printf "      https://figshare.com/articles/dataset/Illumina_amplicon_test_data/16725424\n\n"
     printf "  For version info run \`GL-version\`.\n\n"
     exit
 fi
 
-printf "\n    Downloading Sample-1 read files:\n\n"
-curl -L -o Sample-1_R1_raw.fastq.gz https://figshare.com/ndownloader/files/30963628
-curl -L -o Sample-1_R2_raw.fastq.gz https://figshare.com/ndownloader/files/30963631
 
-printf "\n\n    Downloading Sample-2 read files:\n\n"
-curl -L -o Sample-2_R1_raw.fastq.gz https://figshare.com/ndownloader/files/30963634
-curl -L -o Sample-2_R2_raw.fastq.gz https://figshare.com/ndownloader/files/30963637
+printf "\n    Downloading and unpacking 2 paired-end Illumina amplicon example samples (4 files, ~300 KB total):\n\n"
+curl -L -o example-amplicon-reads.zip https://zenodo.org/record/7939241/files/example-amplicon-reads.zip?download=1
+unzip -q example-amplicon-reads.zip && rm example-amplicon-reads.zip
 
 printf "\n\n  Pulled raw Illumina reads for two test samples from here:\n"
-printf "      https://figshare.com/articles/dataset/Illumina_amplicon_test_data/16725424\n\n"
+printf "      https://zenodo.org/record/7939241#.ZGLaAexlDdI\n\n"
 
-printf "  If using these with the Illumina amplicon workflow, don't forget to put them\n"
-printf "      in the appropriate directory as set in the config.yaml file, and to add their \n"
-printf "      names to the input sample ID file being used :)\n\n\n"
+printf "  If using these with the GeneLab Illumina amplicon workflow, don't forget to modify\n"
+printf "      the input 'raw_reads_dir' directory in the config.yaml file, and to add their \n"
+printf "      names ('Sample-1', 'Sample-2') to the input sample ID file being used :)\n\n\n"
+
+
+
+# printf "\n    Downloading Sample-1 read files:\n\n"
+# curl -L -o Sample-1_R1_raw.fastq.gz https://figshare.com/ndownloader/files/30963628
+# curl -L -o Sample-1_R2_raw.fastq.gz https://figshare.com/ndownloader/files/30963631
+
+# printf "\n\n    Downloading Sample-2 read files:\n\n"
+# curl -L -o Sample-2_R1_raw.fastq.gz https://figshare.com/ndownloader/files/30963634
+# curl -L -o Sample-2_R2_raw.fastq.gz https://figshare.com/ndownloader/files/30963637
+
+# printf "\n\n  Pulled raw Illumina reads for two test samples from here:\n"
+# printf "      https://figshare.com/articles/dataset/Illumina_amplicon_test_data/16725424\n\n"
+
+# printf "  If using these with the Illumina amplicon workflow, don't forget to put them\n"
+# printf "      in the appropriate directory as set in the config.yaml file, and to add their \n"
+# printf "      names to the input sample ID file being used :)\n\n\n"
