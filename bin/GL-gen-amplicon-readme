@@ -27,6 +27,8 @@ parser.add_argument("--protocol-ID", help='Protocol document ID followed (defaul
 parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
                     therefore there are no trimmed sequence data.", action="store_true")
 parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
+parser.add_argument("--raw-reads-dir", help = "Specify location of raw reads directory if they are to be included", action = "store", default = "")
+
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -40,7 +42,7 @@ additional_prefix = str(args.additional_prefix)
 output_file = additional_prefix + str(args.output)
 
 ### hard-coded stuff we might want to change ###
-raw_reads_dir = "Raw_Sequence_Data/"
+# raw_reads_dir = "Raw_Sequence_Data/"
 fastqc_dir = "FastQC_Outputs/"
 trimmed_reads_dir = "Trimmed_Sequence_Data/"
 filtered_reads_dir = "Filtered_Sequence_Data/"
@@ -92,7 +94,8 @@ def write_body(output, processing_zip_contents):
     output.write("    {:<41} {:>0}".format("- " + str(fastqc_dir), "- multiQC summary reports of FastQC runs\n\n"))
 
     # raw reads
-    output.write("    {:<41} {:>0}".format("- " + str(raw_reads_dir), "- initial read fastq files\n\n"))
+    if args.raw_reads_dir != "":
+        output.write("    {:<41} {:>0}".format("- " + str(args.raw_reads_dir), "- initial read fastq files\n\n"))
 
     # primer-trimmed reads if there are any
     if not args.primers_already_trimmed:
@@ -153,13 +156,15 @@ def report_failure(message, color = "yellow"):
 def check_expected_directories():
     """ checks expected directories exist """
 
+    expected_dirs = [fastqc_dir, filtered_reads_dir, final_outputs_dir]
+
+    if args.raw_reads_dir != "":
+
+        expected_dirs.append(args.raw_reads_dir)
+
     if not args.primers_already_trimmed:
 
-        expected_dirs = [raw_reads_dir, fastqc_dir, trimmed_reads_dir, filtered_reads_dir, final_outputs_dir]
-
-    else:
-
-        expected_dirs = [raw_reads_dir, fastqc_dir, filtered_reads_dir, final_outputs_dir]
+        expected_dirs.append(trimmed_reads_dir)
 
     for directory in expected_dirs:
         if not os.path.isdir(directory):
