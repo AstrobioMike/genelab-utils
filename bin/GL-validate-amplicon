@@ -13,18 +13,20 @@ import zipfile
 # import tarfile
 
 
-parser = argparse.ArgumentParser(description="This program validates GeneLab amplicon processed datasets. \
+parser = argparse.ArgumentParser(description = "This program validates GeneLab amplicon processed datasets. \
                                              Hard-coded variables that may need to be changed are near the top \
                                              of the script.")
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
-required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store", required = True)
-parser.add_argument("-p", "--output-prefix", help = "Output file prefix if there is one", action="store", default = "")
-parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
-                    therefore there are no trimmed sequence data.", action="store_true")
-parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
+required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-276")', action = "store", required = True)
+required.add_argument("-s", "--sample-names-file", help = "Single-column file with unique sample names", action = "store", required = True)
+parser.add_argument("-p", "--output-prefix", help = "Output file prefix if there is one", action = "store", default = "")
+parser.add_argument("--primers-already-trimmed", help = "Add this flag if primers were trimmed prior to GeneLab processing, \
+                    therefore there are no trimmed sequence data.", action = "store_true")
+parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing.", action = "store_true")
+parser.add_argument("--raw-reads-dir", help = "Specify location of raw reads directory (when not included, existence of raw reads will not be checked)", 
+                    action = "store", default = "")
 
 
 if len(sys.argv)==1:
@@ -35,7 +37,7 @@ args = parser.parse_args()
 
 
 ### hard-coded stuff we might want to change ###
-raw_reads_dir = "Raw_Sequence_Data/"
+# raw_reads_dir = "Raw_Sequence_Data/"
 fastqc_dir = "FastQC_Outputs/"
 trimmed_reads_dir = "Trimmed_Sequence_Data/"
 filtered_reads_dir = "Filtered_Sequence_Data/"
@@ -140,13 +142,15 @@ def report_success():
 def check_expected_directories():
     """ checks expected directories exist """
 
+    expected_dirs = [fastqc_dir, filtered_reads_dir, final_outputs_dir]
+
+    if args.raw_reads_dir != "":
+
+        expected_dirs.append(args.raw_reads_dir)
+
     if not args.primers_already_trimmed:
 
-        expected_dirs = [raw_reads_dir, fastqc_dir, trimmed_reads_dir, filtered_reads_dir, final_outputs_dir]
-
-    else:
-
-        expected_dirs = [raw_reads_dir, fastqc_dir, filtered_reads_dir, final_outputs_dir]
+        expected_dirs.append(trimmed_reads_dir)
 
     for directory in expected_dirs:
         if not os.path.isdir(directory):
@@ -181,8 +185,9 @@ def check_fastq_files(sample_names):
         if not args.single_ended:
 
             ## raw
-            check_for_file_and_contents(raw_reads_dir + sample + raw_R1_suffix)
-            check_for_file_and_contents(raw_reads_dir + sample + raw_R2_suffix)
+            if args.raw_reads_dir != "":
+                check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_R1_suffix))
+                check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_R2_suffix))
 
             ## trimmed if needed
             if not args.primers_already_trimmed:
@@ -197,7 +202,8 @@ def check_fastq_files(sample_names):
         else:
 
             ## raw
-            check_for_file_and_contents(raw_reads_dir + sample + raw_suffix)
+            if args.raw_reads_dir != "":
+                check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_suffix))
 
             ## trimmed if needed
             if not args.primers_already_trimmed:
