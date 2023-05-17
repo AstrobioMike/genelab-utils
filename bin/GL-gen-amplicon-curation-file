@@ -267,43 +267,6 @@ def get_read_counts_from_raw_multiqc(sample_names, mapping_tab):
         return(df)
 
 
-def gen_and_write_out_QC_metadata_tab(sample_names, read_counts_df):
-
-    # generating needed order of names row writing out table (which has full file names) and as they are in the multiqc table, for finding them
-    read_count_filename_list = []
-    multiqc_name_list = []
-
-    if not args.single_ended:
-
-        for sample in sample_names:
-
-            read_count_filename_list.append(sample + raw_R1_suffix)
-            read_count_filename_list.append(sample + raw_R2_suffix)
-            multiqc_name_list.append(sample + raw_R1_suffix.replace(".fastq.gz", ""))
-            multiqc_name_list.append(sample + raw_R2_suffix.replace(".fastq.gz", ""))
-
-    else:
-
-        for sample in sample_names:
-
-            read_count_filename_list.append(sample + raw_suffix)
-            multiqc_name_list.append(sample + raw_suffix.replace(".fastq.gz", ""))
-
-
-    # getting counts
-    counts_list = []
-    for entry in multiqc_name_list:
-
-        counts_list.append(read_counts_df.at[entry, "counts"])
-
-    # making counts output table
-    out_df = pd.DataFrame()
-    out_df["File Name"] = read_count_filename_list
-    out_df["Number of Reads"] = counts_list
-
-    out_df.to_csv(args.GLDS_ID + "-QC-metadata.tsv", sep = "\t", float_format='%.0f', index = False)
-
-
 def get_prefix_from_map(sample_name, mapping_tab):
 
     # returning empty string if no mapping
