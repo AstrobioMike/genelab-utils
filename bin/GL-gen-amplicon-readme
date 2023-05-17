@@ -9,6 +9,7 @@ import sys
 import argparse
 import textwrap
 import zipfile
+import re
 # import tarfile
 
 
@@ -116,11 +117,24 @@ def write_body(output, processing_zip_contents):
     # processing info
     output.write("    {:<41} {:>0}".format("- " + str(processing_zip_file), "- zip archive holding info related to processing\n"))
     for item in processing_zip_contents:
+
         num_levels = item.count("/")
+
+        if num_levels > 1 and not item.endswith("/"):
+            out_item = re.sub(r'^.*/', '', str(item))
+        elif num_levels == 1 and not item.endswith("/"):
+            out_item = re.sub(r'^.*/', '', str(item))
+        elif num_levels > 1:
+            out_item = re.sub(r'^[^/]*/', '', str(item))
+        else:
+            out_item = str(item)
+
         if item.endswith('/'):
             num_levels -= 1
+
         num_spaces = num_levels * 4
-        output.write("        " + " " * num_spaces + "- " + str(item) + "\n")
+
+        output.write("        " + " " * num_spaces + "- " + out_item + "\n")
 
 
 # setting some colors
