@@ -31,6 +31,8 @@ parser.add_argument("--single-ended", help = "Add this flag if data are single-e
 parser.add_argument("--type", help = 'Specify if ASVs or OTUs (default: "ASVs")', action = "store", choices = ["ASVs", "OTUs"], default = "ASVs")
 parser.add_argument("--map", help = 'Mapping file if samples come from more than one primer set (tab-delimited, first column holds sample IDs, second column holds the filename prefix of the outputs specific to that sample)', action = "store")
 parser.add_argument("--additional-prefix", help = "Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action = "store")
+parser.add_argument("--R1-used-as-single-ended-data", help = "Provide this flag if processing only R1 reads as single-end (as the expected raw filename suffixes will have 'R1' in there)", 
+                    action = "store_true")
 
 
 if len(sys.argv)==1:
@@ -55,6 +57,9 @@ final_outputs_dir = "Final_Outputs/"
 raw_suffix = "_raw.fastq.gz"
 raw_R1_suffix = "_R1_raw.fastq.gz"
 raw_R2_suffix = "_R2_raw.fastq.gz"
+if args.R1_used_as_single_ended_data:
+    raw_suffix = raw_R1_suffix = "_R1_raw.fastq.gz"
+
 primer_trimmed_suffix = "_trimmed.fastq.gz"
 primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
 primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
@@ -279,11 +284,11 @@ def get_read_count_from_df(sample_name, read_counts_tab):
 
     if args.single_ended:
 
-        return(round(read_counts_tab.at[str(sample_name) + "_raw", "counts"]))
+        return(round(read_counts_tab.at[str(sample_name) + raw_suffix.replace(".fastq.gz", ""), "counts"]))
 
     else:
 
-        return(round(read_counts_tab.at[str(sample_name) + "_R1_raw", "counts"]))
+        return(round(read_counts_tab.at[str(sample_name) + raw_R1_suffix.replace(".fastq.gz", ""), "counts"]))
 
 
 def gen_and_write_out_filenames_table(unique_filename_prefixes, mapping_tab, read_count_tab, sample_file_dict):
@@ -333,7 +338,13 @@ def gen_and_write_out_filenames_table(unique_filename_prefixes, mapping_tab, rea
 
         if args.single_ended:
 
-            curr_raw_data = [raw_file_prefix + sample + raw_suffix]
+            # if only forward read was used, still want to include both in the "Raw Data" column because this is tied to the hosted raw data, not just what was used here
+            if args.R1_used_as_single_ended_data:
+                curr_raw_data = [raw_file_prefix + sample + raw_R1_suffix, raw_file_prefix + sample + raw_R2_suffix]
+
+            else:
+                curr_raw_data = [raw_file_prefix + sample + raw_suffix]
+
             curr_trimmed_data = [file_prefix + sample + primer_trimmed_suffix, 
                                  file_prefix + additional_prefix + "trimmed-read-counts.tsv", 
                                  file_prefix + additional_prefix + "cutadapt.log"]
