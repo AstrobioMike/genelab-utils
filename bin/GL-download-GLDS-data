@@ -296,11 +296,15 @@ def get_targets_from_assay_table(all_files, num_total_files):
 
         if "," in entry:
 
-            target_files.extend(entry.split(","))
+            # dealing with some that may have spaces after commas delineating files
+            curr_list = entry.split(",")
+            curr_list = [item.strip() for item in curr_list]
+
+            target_files.extend(curr_list)
 
         else:
 
-            target_files.append(entry)
+            target_files.append(entry.strip())
 
     num_files_to_download = len(target_files)
         
