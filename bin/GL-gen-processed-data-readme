@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(description = "This program generates the corre
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-a", "--assay", choices = ['Amplicon', 'Metagenomics'], 
-                      help = "Specifies which datatype (assay) this is for")
+                      help = "Specifies which datatype (assay) this is for", action = "store", required = True)
 
 required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-69")', action = "store", required = True)
 parser.add_argument("--output", help = 'Name of output file (default: "README.txt", with appended prefix if one is provided)', default = "README.txt")

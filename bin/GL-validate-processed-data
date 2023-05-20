@@ -18,12 +18,12 @@ parser = argparse.ArgumentParser(description = "This program validates GeneLab p
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-a", "--assay", choices = ['Amplicon', 'Metagenomics'], 
-                      help = "Specifies which datatype (assay) is to be validated")
+                      help = "Specifies which datatype (assay) is to be validated", action = "store", required = True)
 
-required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store", required = True)
-required.add_argument("-s", "--sample-names-file", help="Single-column file with unique sample names", action="store", required = True)
+required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-276")', action = "store", required = True)
+required.add_argument("-s", "--sample-names-file", help = "Single-column file with unique sample names", action = "store", required = True)
 parser.add_argument("-p", "--output-prefix", help = "Output additional file prefix if there is one", action = "store", default = "")
-parser.add_argument("--single-ended", help="Add this flag if data are single-end sequencing.", action="store_true")
+parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing.", action = "store_true")
 parser.add_argument("--primers-already-trimmed", help = "Add this flag if primers were trimmed prior to GeneLab processing, \
                     therefore there are no trimmed sequence data (only relevant for Amplicon)", action = "store_true")
 parser.add_argument("--raw-reads-dir", help = "Specify location of raw reads directory (when not included, existence of raw reads will not be checked)", 

@@ -1,399 +1,402 @@
 #!/usr/bin/env python
 
-"""
-This is a program for generating the table needed for GeneLab amplicon processed datasets for Curation.
-"""
+print("\n  This program has been deprecated, please see `GL-gen-file-associations-table`.\n")
+exit()
 
-import os
-import sys
-import argparse
-import textwrap
-import pandas as pd
-import tarfile
-import zipfile
+# """
+# This is a program for generating the table needed for GeneLab amplicon processed datasets for Curation.
+# """
 
-parser = argparse.ArgumentParser(description = "This program generates table needed by curation for GeneLab amplicon \
-                                             processed datasets.\
-                                             Hard-coded variables that may need to be changed are at the top \
-                                             of the script. It is expected to be run after `GL-validate-amplicon` and \
-                                             `GL-gen-amplicon-readme` have been run successfully.")
+# import os
+# import sys
+# import argparse
+# import textwrap
+# import pandas as pd
+# import tarfile
+# import zipfile
 
-required = parser.add_argument_group('required arguments')
+# parser = argparse.ArgumentParser(description = "This program generates table needed by curation for GeneLab amplicon \
+#                                              processed datasets.\
+#                                              Hard-coded variables that may need to be changed are at the top \
+#                                              of the script. It is expected to be run after `GL-validate-amplicon` and \
+#                                              `GL-gen-amplicon-readme` have been run successfully.")
 
-required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-276")', action = "store", required = True)
-parser.add_argument("-i", "--isa-zip", help = 'Appropriate ISA file for dataset (a zip archive, providing this will assume there is only one a_* assay table in there, \
-                                               if that\'s not the case, explicitly provide the assay table to the \'-a\' argument instead)', action = "store", default = "")
-parser.add_argument("-a", "--assay-table", help = 'Appropriate assay table for dataset (this can be provided directly instead of being pulled from an ISA object)', action = "store", default = "")
+# required = parser.add_argument_group('required arguments')
 
-parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
-                    therefore there are no trimmed sequence data.", action = "store_true")
-parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing.", action = "store_true")
-parser.add_argument("--type", help = 'Specify if ASVs or OTUs (default: "ASVs")', action = "store", choices = ["ASVs", "OTUs"], default = "ASVs")
-parser.add_argument("--map", help = 'Mapping file if samples come from more than one primer set (tab-delimited, first column holds sample IDs, second column holds the filename prefix of the outputs specific to that sample)', action = "store")
-parser.add_argument("--additional-prefix", help = "Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action = "store")
-parser.add_argument("--R1-used-as-single-ended-data", help = "Provide this flag if processing only R1 reads as single-end (as the expected raw filename suffixes will have 'R1' in there)", 
-                    action = "store_true")
+# required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-276")', action = "store", required = True)
+# parser.add_argument("-i", "--isa-zip", help = 'Appropriate ISA file for dataset (a zip archive, providing this will assume there is only one a_* assay table in there, \
+#                                                if that\'s not the case, explicitly provide the assay table to the \'-a\' argument instead)', action = "store", default = "")
+# parser.add_argument("-a", "--assay-table", help = 'Appropriate assay table for dataset (this can be provided directly instead of being pulled from an ISA object)', action = "store", default = "")
 
-
-if len(sys.argv)==1:
-    parser.print_help(sys.stderr)
-    sys.exit(0)
-
-args = parser.parse_args()
-
-additional_prefix = str(args.additional_prefix)
-
-### hard-coded stuff we might want to change ###
-file_prefix = args.GLDS_ID + "_GAmplicon_"
-# this one is only used for the raw data files
-raw_file_prefix = args.GLDS_ID + "_Amplicon_"
-
-raw_reads_dir = "Raw_Sequence_Data/"
-fastqc_dir = "FastQC_Outputs/"
-trimmed_reads_dir = "Trimmed_Sequence_Data/"
-filtered_reads_dir = "Filtered_Sequence_Data/"
-final_outputs_dir = "Final_Outputs/"
-
-raw_suffix = "_raw.fastq.gz"
-raw_R1_suffix = "_R1_raw.fastq.gz"
-raw_R2_suffix = "_R2_raw.fastq.gz"
-if args.R1_used_as_single_ended_data:
-    raw_suffix = raw_R1_suffix = "_R1_raw.fastq.gz"
-
-primer_trimmed_suffix = "_trimmed.fastq.gz"
-primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
-primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
-filtered_suffix = "_filtered.fastq.gz"
-filtered_R1_suffix = "_R1_filtered.fastq.gz"
-filtered_R2_suffix = "_R2_filtered.fastq.gz"
-
-processing_zip_file = additional_prefix + "processing_info.zip"
+# parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
+#                     therefore there are no trimmed sequence data.", action = "store_true")
+# parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing.", action = "store_true")
+# parser.add_argument("--type", help = 'Specify if ASVs or OTUs (default: "ASVs")', action = "store", choices = ["ASVs", "OTUs"], default = "ASVs")
+# parser.add_argument("--map", help = 'Mapping file if samples come from more than one primer set (tab-delimited, first column holds sample IDs, second column holds the filename prefix of the outputs specific to that sample)', action = "store")
+# parser.add_argument("--additional-prefix", help = "Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action = "store")
+# parser.add_argument("--R1-used-as-single-ended-data", help = "Provide this flag if processing only R1 reads as single-end (as the expected raw filename suffixes will have 'R1' in there)", 
+#                     action = "store_true")
 
 
-################################################################################
+# if len(sys.argv)==1:
+#     parser.print_help(sys.stderr)
+#     sys.exit(0)
 
-def main():
+# args = parser.parse_args()
 
-    preflight_checks()
+# additional_prefix = str(args.additional_prefix)
 
-    assay_table = get_assay_table()
+# ### hard-coded stuff we might want to change ###
+# file_prefix = args.GLDS_ID + "_GAmplicon_"
+# # this one is only used for the raw data files
+# raw_file_prefix = args.GLDS_ID + "_Amplicon_"
 
-    sample_names, unique_filename_prefixes = get_sample_names_and_unique_filenames(assay_table)
+# raw_reads_dir = "Raw_Sequence_Data/"
+# fastqc_dir = "FastQC_Outputs/"
+# trimmed_reads_dir = "Trimmed_Sequence_Data/"
+# filtered_reads_dir = "Filtered_Sequence_Data/"
+# final_outputs_dir = "Final_Outputs/"
 
-    sample_file_dict = dict(zip(unique_filename_prefixes, sample_names))
+# raw_suffix = "_raw.fastq.gz"
+# raw_R1_suffix = "_R1_raw.fastq.gz"
+# raw_R2_suffix = "_R2_raw.fastq.gz"
+# if args.R1_used_as_single_ended_data:
+#     raw_suffix = raw_R1_suffix = "_R1_raw.fastq.gz"
 
-    if args.map:
-        map_tab = pd.read_csv(args.map, sep = "\t", names = ["sample", "prefix"])
-        map_tab.set_index("sample", inplace = True)
+# primer_trimmed_suffix = "_trimmed.fastq.gz"
+# primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
+# primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
+# filtered_suffix = "_filtered.fastq.gz"
+# filtered_R1_suffix = "_R1_filtered.fastq.gz"
+# filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
-    else:
-        map_tab = None
-
-    read_counts_df = get_read_counts_from_raw_multiqc(sample_names, map_tab)
-
-    gen_and_write_out_filenames_table(unique_filename_prefixes, map_tab, read_counts_df, sample_file_dict)
-
-################################################################################
-
-
-# setting some colors
-tty_colors = {
-    'green' : '\033[0;32m%s\033[0m',
-    'yellow' : '\033[0;33m%s\033[0m',
-    'red' : '\033[0;31m%s\033[0m'
-}
-
-
-### functions ###
-def color_text(text, color='green'):
-    if sys.stdout.isatty():
-        return tty_colors[color] % text
-    else:
-        return text
+# processing_zip_file = additional_prefix + "processing_info.zip"
 
 
-def wprint(text):
-    """ print wrapper """
+# ################################################################################
 
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
-          subsequent_indent="  ", break_on_hyphens=False))
+# def main():
 
+#     preflight_checks()
 
-def report_failure(message, color = "yellow"):
-    print("")
-    wprint(color_text(message, color))
-    print("\nCuration file-associations table generation failed.\n")
-    sys.exit(1)
+#     assay_table = get_assay_table()
 
+#     sample_names, unique_filename_prefixes = get_sample_names_and_unique_filenames(assay_table)
 
-def preflight_checks():
+#     sample_file_dict = dict(zip(unique_filename_prefixes, sample_names))
 
-    # ensuring at least, and only, one of input ISA or assay table
-    if args.isa_zip == "" and args.assay_table == "":
-        report_failure("This program requires either an input ISA object (passed to '-i') or a specific assay table (passed to '-a').")
+#     if args.map:
+#         map_tab = pd.read_csv(args.map, sep = "\t", names = ["sample", "prefix"])
+#         map_tab.set_index("sample", inplace = True)
 
-    if args.isa_zip != "" and args.assay_table != "":
-        report_failure("This program requires *only* an input ISA object (passed to '-i') or a specific assay table (passed to '-a'), not both.")
+#     else:
+#         map_tab = None
 
+#     read_counts_df = get_read_counts_from_raw_multiqc(sample_names, map_tab)
 
-def check_for_file_and_contents(file_path):
+#     gen_and_write_out_filenames_table(unique_filename_prefixes, map_tab, read_counts_df, sample_file_dict)
 
-    if not os.path.exists(file_path):
-        report_failure("The expected file '" + str(file_path) + "' does not exist.")
-    if not os.path.getsize(file_path) > 0:
-        report_failure("The file '" + str(file_path) + "' is empty.")
+# ################################################################################
 
 
-def get_assay_table_from_ISA(isa_file):
-    """ tries to find a single assay table in an isa object """
-
-    zip_file = zipfile.ZipFile(isa_file)
-    isa_files = zip_file.namelist()
-
-    # getting wanted filename (those that start with "a_" seem to be what we want)
-    wanted_file_list = [item for item in isa_files if item.startswith("a_")]
-    if len(wanted_file_list) != 1:
-        report_failure("We couldn't find the correct assay table in the ISA object, consider passing it directly to the '-a' argument.")
-
-    wanted_file = wanted_file_list[0]
-
-    df = pd.read_csv(zip_file.open(wanted_file), sep = "\t")
-
-    return(df)
+# # setting some colors
+# tty_colors = {
+#     'green' : '\033[0;32m%s\033[0m',
+#     'yellow' : '\033[0;33m%s\033[0m',
+#     'red' : '\033[0;31m%s\033[0m'
+# }
 
 
-def get_assay_table():
-
-    # getting assay table if we are using an input isa object
-    if args.isa_zip != "":
-        check_for_file_and_contents(args.isa_zip)
-
-        assay_table = get_assay_table_from_ISA(args.isa_zip)
-
-    # reading assay table if provided directly
-    else:
-
-        check_for_file_and_contents(args.assay_table)
-        assay_table = pd.read_csv(args.assay_table, sep = "\t")
-
-    return(assay_table)
+# ### functions ###
+# def color_text(text, color='green'):
+#     if sys.stdout.isatty():
+#         return tty_colors[color] % text
+#     else:
+#         return text
 
 
-def get_sample_names_and_unique_filenames(assay_table):
-    """
-    This gets the sample names (first column) from the assay table,
-    and tries to get what would have been the unique filename prefixes generated from those
-    based on what's in the Raw Data File column of the assay table.
-    """
+# def wprint(text):
+#     """ print wrapper """
 
-    sample_names = assay_table["Sample Name"].tolist()
+#     print(textwrap.fill(text, width=80, initial_indent="  ", 
+#           subsequent_indent="  ", break_on_hyphens=False))
 
-    all_filenames = assay_table["Raw Data File"]
 
-    unique_filename_prefixes = []
+# def report_failure(message, color = "yellow"):
+#     print("")
+#     wprint(color_text(message, color))
+#     print("\nCuration file-associations table generation failed.\n")
+#     sys.exit(1)
+
+
+# def preflight_checks():
+
+#     # ensuring at least, and only, one of input ISA or assay table
+#     if args.isa_zip == "" and args.assay_table == "":
+#         report_failure("This program requires either an input ISA object (passed to '-i') or a specific assay table (passed to '-a').")
+
+#     if args.isa_zip != "" and args.assay_table != "":
+#         report_failure("This program requires *only* an input ISA object (passed to '-i') or a specific assay table (passed to '-a'), not both.")
+
+
+# def check_for_file_and_contents(file_path):
+
+#     if not os.path.exists(file_path):
+#         report_failure("The expected file '" + str(file_path) + "' does not exist.")
+#     if not os.path.getsize(file_path) > 0:
+#         report_failure("The file '" + str(file_path) + "' is empty.")
+
+
+# def get_assay_table_from_ISA(isa_file):
+#     """ tries to find a single assay table in an isa object """
+
+#     zip_file = zipfile.ZipFile(isa_file)
+#     isa_files = zip_file.namelist()
+
+#     # getting wanted filename (those that start with "a_" seem to be what we want)
+#     wanted_file_list = [item for item in isa_files if item.startswith("a_")]
+#     if len(wanted_file_list) != 1:
+#         report_failure("We couldn't find the correct assay table in the ISA object, consider passing it directly to the '-a' argument.")
+
+#     wanted_file = wanted_file_list[0]
+
+#     df = pd.read_csv(zip_file.open(wanted_file), sep = "\t")
+
+#     return(df)
+
+
+# def get_assay_table():
+
+#     # getting assay table if we are using an input isa object
+#     if args.isa_zip != "":
+#         check_for_file_and_contents(args.isa_zip)
+
+#         assay_table = get_assay_table_from_ISA(args.isa_zip)
+
+#     # reading assay table if provided directly
+#     else:
+
+#         check_for_file_and_contents(args.assay_table)
+#         assay_table = pd.read_csv(args.assay_table, sep = "\t")
+
+#     return(assay_table)
+
+
+# def get_sample_names_and_unique_filenames(assay_table):
+#     """
+#     This gets the sample names (first column) from the assay table,
+#     and tries to get what would have been the unique filename prefixes generated from those
+#     based on what's in the Raw Data File column of the assay table.
+#     """
+
+#     sample_names = assay_table["Sample Name"].tolist()
+
+#     all_filenames = assay_table["Raw Data File"]
+
+#     unique_filename_prefixes = []
     
-    # attempting to split if they have multiple files (like paired-end)
-    # and also removing the common prefixes and suffixes intending to create the same 
-    # unique filenames used for processing
-    for entry in all_filenames:
+#     # attempting to split if they have multiple files (like paired-end)
+#     # and also removing the common prefixes and suffixes intending to create the same 
+#     # unique filenames used for processing
+#     for entry in all_filenames:
 
-        # splitting if there are more than one (like with paired-end)
-        curr_name = entry.split(",")[0]
+#         # splitting if there are more than one (like with paired-end)
+#         curr_name = entry.split(",")[0]
 
-        # removing expected prefix
-        curr_name = curr_name.replace(raw_file_prefix, "")
+#         # removing expected prefix
+#         curr_name = curr_name.replace(raw_file_prefix, "")
 
-        # removing potential suffixes (also checking R2 in case they are not in the appropriate order in the sample table, e.g. R2 before R1)
-        curr_name = curr_name.replace(raw_R1_suffix, "")
-        curr_name = curr_name.replace(raw_R2_suffix, "")
-        curr_name = curr_name.replace(raw_suffix, "")
+#         # removing potential suffixes (also checking R2 in case they are not in the appropriate order in the sample table, e.g. R2 before R1)
+#         curr_name = curr_name.replace(raw_R1_suffix, "")
+#         curr_name = curr_name.replace(raw_R2_suffix, "")
+#         curr_name = curr_name.replace(raw_suffix, "")
 
-        unique_filename_prefixes.append(curr_name)
+#         unique_filename_prefixes.append(curr_name)
 
-    return(sample_names, unique_filename_prefixes)
-
-
-def get_samples_from_ISA(isa_file):
-    """ gets the sample names in their order from the ISA zip file """
-
-    zip_file = zipfile.ZipFile(isa_file)
-    isa_files = zip_file.namelist()
-
-    # getting wanted filename (those that start with "a_" seem to be what we want)
-    wanted_file_list = [item for item in isa_files if item.startswith("a_")]
-    if len(wanted_file_list) != 1:
-        report_failure("We couldn't find the correct assay table in the ISA object, consider passing it directly to the '-a' argument.")
-
-    wanted_file = wanted_file_list[0]
-
-    df = pd.read_csv(zip_file.open(wanted_file), sep = "\t", usecols = ["Sample Name"])
-    sample_IDs = df["Sample Name"].tolist()
-
-    return(sample_IDs)
+#     return(sample_names, unique_filename_prefixes)
 
 
-def get_read_counts_from_raw_multiqc(sample_names, mapping_tab):
+# def get_samples_from_ISA(isa_file):
+#     """ gets the sample names in their order from the ISA zip file """
 
-    # these are in multiple files if there was a mapping input table
-    if isinstance(mapping_tab, pd.DataFrame):
-        unique_prefixes = mapping_tab.prefix.unique()
+#     zip_file = zipfile.ZipFile(isa_file)
+#     isa_files = zip_file.namelist()
 
-        # starting list to hold all dataframes we'll read in
-        df_list = []
+#     # getting wanted filename (those that start with "a_" seem to be what we want)
+#     wanted_file_list = [item for item in isa_files if item.startswith("a_")]
+#     if len(wanted_file_list) != 1:
+#         report_failure("We couldn't find the correct assay table in the ISA object, consider passing it directly to the '-a' argument.")
 
-        # working through each one
-        for prefix in unique_prefixes:
+#     wanted_file = wanted_file_list[0]
 
-            curr_file_path = fastqc_dir + additional_prefix + prefix + "-raw_multiqc_data.zip"
+#     df = pd.read_csv(zip_file.open(wanted_file), sep = "\t", usecols = ["Sample Name"])
+#     sample_IDs = df["Sample Name"].tolist()
 
-            # making sure there are multiqc files for each unique prefix given in the mapping table
-            check_for_file_and_contents(curr_file_path)
-
-            # reading in
-            zip_file = zipfile.ZipFile(curr_file_path)
-            curr_df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
-            curr_df.columns = ["sample", "counts"]
-            curr_df.set_index("sample", inplace = True)
-
-            # adding to list
-            df_list.append(curr_df)
-
-        # combining tables
-        df = pd.concat(df_list, axis = 0)
-
-        return(df)
-
-    else:
-        zip_file = zipfile.ZipFile(fastqc_dir + additional_prefix + "raw_multiqc_data.zip")
-        df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
-        df.columns = ["sample", "counts"]
-        df.set_index("sample", inplace = True)
-
-        return(df)
+#     return(sample_IDs)
 
 
-def get_prefix_from_map(sample_name, mapping_tab):
+# def get_read_counts_from_raw_multiqc(sample_names, mapping_tab):
 
-    # returning empty string if no mapping
-    if not isinstance(mapping_tab, pd.DataFrame):
-        return("")
-    else:
-        return(mapping_tab.at[sample_name, "prefix"] + "-")
+#     # these are in multiple files if there was a mapping input table
+#     if isinstance(mapping_tab, pd.DataFrame):
+#         unique_prefixes = mapping_tab.prefix.unique()
 
-def get_read_count_from_df(sample_name, read_counts_tab):
+#         # starting list to hold all dataframes we'll read in
+#         df_list = []
 
-    if args.single_ended:
+#         # working through each one
+#         for prefix in unique_prefixes:
 
-        return(round(read_counts_tab.at[str(sample_name) + raw_suffix.replace(".fastq.gz", ""), "counts"]))
+#             curr_file_path = fastqc_dir + additional_prefix + prefix + "-raw_multiqc_data.zip"
 
-    else:
+#             # making sure there are multiqc files for each unique prefix given in the mapping table
+#             check_for_file_and_contents(curr_file_path)
 
-        return(round(read_counts_tab.at[str(sample_name) + raw_R1_suffix.replace(".fastq.gz", ""), "counts"]))
+#             # reading in
+#             zip_file = zipfile.ZipFile(curr_file_path)
+#             curr_df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+#             curr_df.columns = ["sample", "counts"]
+#             curr_df.set_index("sample", inplace = True)
+
+#             # adding to list
+#             df_list.append(curr_df)
+
+#         # combining tables
+#         df = pd.concat(df_list, axis = 0)
+
+#         return(df)
+
+#     else:
+#         zip_file = zipfile.ZipFile(fastqc_dir + additional_prefix + "raw_multiqc_data.zip")
+#         df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+#         df.columns = ["sample", "counts"]
+#         df.set_index("sample", inplace = True)
+
+#         return(df)
 
 
-def gen_and_write_out_filenames_table(unique_filename_prefixes, mapping_tab, read_count_tab, sample_file_dict):
+# def get_prefix_from_map(sample_name, mapping_tab):
 
-    ## builds as if primers were trimmed by the workflow (with Trimmed column), but that is removed later if
-    ## --primers-already-trimmed argument was provided
-    header_colnames = ["Sample Name", 
-                       "Parameter Value[README]",
-                       "Parameter Value[" + raw_reads_dir.replace("_", " ").rstrip("/") + "]",
-                       "Parameter Value[Read Depth]", 
-                       "Unit",
-                       "Parameter Value[" + trimmed_reads_dir.replace("_", " ").rstrip("/") + "]",
-                       "Parameter Value[" + filtered_reads_dir.replace("_", " ").rstrip("/") + "]",
-                       "Parameter Value[" + fastqc_dir.replace("_", " ").rstrip("/") + "]",
-                       "Parameter Value[" + final_outputs_dir.replace("_", " ").rstrip("/") + "]",
-                       "Parameter Value[Processing Info]"]
+#     # returning empty string if no mapping
+#     if not isinstance(mapping_tab, pd.DataFrame):
+#         return("")
+#     else:
+#         return(mapping_tab.at[sample_name, "prefix"] + "-")
+
+# def get_read_count_from_df(sample_name, read_counts_tab):
+
+#     if args.single_ended:
+
+#         return(round(read_counts_tab.at[str(sample_name) + raw_suffix.replace(".fastq.gz", ""), "counts"]))
+
+#     else:
+
+#         return(round(read_counts_tab.at[str(sample_name) + raw_R1_suffix.replace(".fastq.gz", ""), "counts"]))
 
 
-    # entries and values that don't change per sample
-    readme = file_prefix + additional_prefix + "README.txt"
-    fastqc = [file_prefix + additional_prefix + "raw_multiqc_data.zip", 
-              file_prefix + additional_prefix + "raw_multiqc_report.html", 
-              file_prefix + additional_prefix + "filtered_multiqc_data.zip", 
-              file_prefix + additional_prefix + "filtered_multiqc_report.html"]
+# def gen_and_write_out_filenames_table(unique_filename_prefixes, mapping_tab, read_count_tab, sample_file_dict):
+
+#     ## builds as if primers were trimmed by the workflow (with Trimmed column), but that is removed later if
+#     ## --primers-already-trimmed argument was provided
+#     header_colnames = ["Sample Name", 
+#                        "Parameter Value[README]",
+#                        "Parameter Value[" + raw_reads_dir.replace("_", " ").rstrip("/") + "]",
+#                        "Parameter Value[Read Depth]", 
+#                        "Unit",
+#                        "Parameter Value[" + trimmed_reads_dir.replace("_", " ").rstrip("/") + "]",
+#                        "Parameter Value[" + filtered_reads_dir.replace("_", " ").rstrip("/") + "]",
+#                        "Parameter Value[" + fastqc_dir.replace("_", " ").rstrip("/") + "]",
+#                        "Parameter Value[" + final_outputs_dir.replace("_", " ").rstrip("/") + "]",
+#                        "Parameter Value[Processing Info]"]
+
+
+#     # entries and values that don't change per sample
+#     readme = file_prefix + additional_prefix + "README.txt"
+#     fastqc = [file_prefix + additional_prefix + "raw_multiqc_data.zip", 
+#               file_prefix + additional_prefix + "raw_multiqc_report.html", 
+#               file_prefix + additional_prefix + "filtered_multiqc_data.zip", 
+#               file_prefix + additional_prefix + "filtered_multiqc_report.html"]
     
-    if args.type == "ASVs":
-        rep_seq_output = file_prefix + additional_prefix + "ASVs.fasta"
-    else:
-        rep_seq_output = file_prefix + additional_prefix + "OTUs.fasta"
+#     if args.type == "ASVs":
+#         rep_seq_output = file_prefix + additional_prefix + "ASVs.fasta"
+#     else:
+#         rep_seq_output = file_prefix + additional_prefix + "OTUs.fasta"
 
-    final_outputs = [rep_seq_output, 
-                     file_prefix + additional_prefix + "counts.tsv", 
-                     file_prefix + additional_prefix + "read-count-tracking.tsv", 
-                     file_prefix + additional_prefix + "taxonomy-and-counts.biom.zip", 
-                     file_prefix + additional_prefix + "taxonomy-and-counts.tsv", 
-                     file_prefix + additional_prefix + "taxonomy.tsv"]
+#     final_outputs = [rep_seq_output, 
+#                      file_prefix + additional_prefix + "counts.tsv", 
+#                      file_prefix + additional_prefix + "read-count-tracking.tsv", 
+#                      file_prefix + additional_prefix + "taxonomy-and-counts.biom.zip", 
+#                      file_prefix + additional_prefix + "taxonomy-and-counts.tsv", 
+#                      file_prefix + additional_prefix + "taxonomy.tsv"]
 
-    processing_info = file_prefix + additional_prefix + "processing_info.zip"
+#     processing_info = file_prefix + additional_prefix + "processing_info.zip"
 
-    read_count_unit = "read"
-    read_count_term_source_ref = "SO"
-    read_count_term_acc_number = "http://purl.obolibrary.org/obo/SO_0000150"
+#     read_count_unit = "read"
+#     read_count_term_source_ref = "SO"
+#     read_count_term_acc_number = "http://purl.obolibrary.org/obo/SO_0000150"
 
-    building_df = pd.DataFrame(columns = header_colnames)
+#     building_df = pd.DataFrame(columns = header_colnames)
 
-    for sample in unique_filename_prefixes:
+#     for sample in unique_filename_prefixes:
 
-        if args.single_ended:
+#         if args.single_ended:
 
-            # if only forward read was used, still want to include both in the "Raw Data" column because this is tied to the hosted raw data, not just what was used here
-            if args.R1_used_as_single_ended_data:
-                curr_raw_data = [raw_file_prefix + sample + raw_R1_suffix, raw_file_prefix + sample + raw_R2_suffix]
+#             # if only forward read was used, still want to include both in the "Raw Data" column because this is tied to the hosted raw data, not just what was used here
+#             if args.R1_used_as_single_ended_data:
+#                 curr_raw_data = [raw_file_prefix + sample + raw_R1_suffix, raw_file_prefix + sample + raw_R2_suffix]
 
-            else:
-                curr_raw_data = [raw_file_prefix + sample + raw_suffix]
+#             else:
+#                 curr_raw_data = [raw_file_prefix + sample + raw_suffix]
 
-            curr_trimmed_data = [file_prefix + sample + primer_trimmed_suffix, 
-                                 file_prefix + additional_prefix + "trimmed-read-counts.tsv", 
-                                 file_prefix + additional_prefix + "cutadapt.log"]
-            # curr_filt_data = [file_prefix + sample + filtered_suffix, 
-            #                   file_prefix + additional_prefix + "filtered-read-counts.tsv", 
-            #                   file_prefix + additional_prefix + "bbduk.log"]
+#             curr_trimmed_data = [file_prefix + sample + primer_trimmed_suffix, 
+#                                  file_prefix + additional_prefix + "trimmed-read-counts.tsv", 
+#                                  file_prefix + additional_prefix + "cutadapt.log"]
+#             # curr_filt_data = [file_prefix + sample + filtered_suffix, 
+#             #                   file_prefix + additional_prefix + "filtered-read-counts.tsv", 
+#             #                   file_prefix + additional_prefix + "bbduk.log"]
 
-            curr_filt_data = [file_prefix + sample + filtered_suffix, 
-                              file_prefix + additional_prefix + "filtered-read-counts.tsv"]
-
-
-        else:
-
-            curr_raw_data = [raw_file_prefix + sample + raw_R1_suffix, raw_file_prefix + sample + raw_R2_suffix]
-            curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, 
-                                 file_prefix + sample + primer_trimmed_R2_suffix, 
-                                 file_prefix + additional_prefix + "trimmed-read-counts.tsv", 
-                                 file_prefix + additional_prefix + "cutadapt.log"]
-            curr_filt_data = [file_prefix + sample + filtered_R1_suffix, 
-                              file_prefix + sample + filtered_R2_suffix, 
-                              file_prefix + additional_prefix + "filtered-read-counts.tsv"]
-
-        curr_read_count = get_read_count_from_df(sample, read_count_tab)
-
-        curr_row_as_list = [sample_file_dict[sample],
-                            readme,
-                            ", ".join(curr_raw_data),
-                            curr_read_count, 
-                            read_count_unit,
-                            ", ".join(curr_trimmed_data),
-                            ", ".join(curr_filt_data),
-                            ", ".join(fastqc),
-                            ", ".join(final_outputs),
-                            processing_info]
-
-        # adding to building dataframe
-        building_df.loc[len(building_df)] = curr_row_as_list
-
-    # removing trimmed column if primers were already removed and no primer-removal was done
-    if args.primers_already_trimmed:
-
-        building_df.drop("Parameter Value[Trimmed Sequence Data]", axis = 1, inplace = True)
-
-    # writing out
-    if additional_prefix != "":
-        building_df.to_csv(str(args.GLDS_ID) + "_" + additional_prefix + "associated-file-names.tsv", sep = "\t", index = False)
-    else:
-        building_df.to_csv(str(args.GLDS_ID) + "-associated-file-names.tsv", sep = "\t", index = False)
+#             curr_filt_data = [file_prefix + sample + filtered_suffix, 
+#                               file_prefix + additional_prefix + "filtered-read-counts.tsv"]
 
 
-if __name__ == "__main__":
-    main()
+#         else:
+
+#             curr_raw_data = [raw_file_prefix + sample + raw_R1_suffix, raw_file_prefix + sample + raw_R2_suffix]
+#             curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, 
+#                                  file_prefix + sample + primer_trimmed_R2_suffix, 
+#                                  file_prefix + additional_prefix + "trimmed-read-counts.tsv", 
+#                                  file_prefix + additional_prefix + "cutadapt.log"]
+#             curr_filt_data = [file_prefix + sample + filtered_R1_suffix, 
+#                               file_prefix + sample + filtered_R2_suffix, 
+#                               file_prefix + additional_prefix + "filtered-read-counts.tsv"]
+
+#         curr_read_count = get_read_count_from_df(sample, read_count_tab)
+
+#         curr_row_as_list = [sample_file_dict[sample],
+#                             readme,
+#                             ", ".join(curr_raw_data),
+#                             curr_read_count, 
+#                             read_count_unit,
+#                             ", ".join(curr_trimmed_data),
+#                             ", ".join(curr_filt_data),
+#                             ", ".join(fastqc),
+#                             ", ".join(final_outputs),
+#                             processing_info]
+
+#         # adding to building dataframe
+#         building_df.loc[len(building_df)] = curr_row_as_list
+
+#     # removing trimmed column if primers were already removed and no primer-removal was done
+#     if args.primers_already_trimmed:
+
+#         building_df.drop("Parameter Value[Trimmed Sequence Data]", axis = 1, inplace = True)
+
+#     # writing out
+#     if additional_prefix != "":
+#         building_df.to_csv(str(args.GLDS_ID) + "_" + additional_prefix + "associated-file-names.tsv", sep = "\t", index = False)
+#     else:
+#         building_df.to_csv(str(args.GLDS_ID) + "-associated-file-names.tsv", sep = "\t", index = False)
+
+
+# if __name__ == "__main__":
+#     main()
