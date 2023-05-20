@@ -1,226 +1,228 @@
 #!/usr/bin/env python
 
-"""
-This is a program for generating the README.txt file for GeneLab amplicon processed datasets.
-"""
+print("\n  This program has been deprecated, please see `GL-gen-processed-data-readme`.\n")
+exit()
 
-import os
-import sys
-import argparse
-import textwrap
-import zipfile
-import re
-# import tarfile
+# """
+# This is a program for generating the README.txt file for GeneLab amplicon processed datasets.
+# """
 
+# import os
+# import sys
+# import argparse
+# import textwrap
+# import zipfile
+# import re
+# # import tarfile
 
-parser = argparse.ArgumentParser(description="This program generates the corresponding README file for GeneLab amplicon processed datasets. \
-                                             Hard-coded variables that may need to be changed are at the top \
-                                             of the script. It is expected to be run after `GL-validate-amplicon` has\
-                                             been run successfully.")
 
-required = parser.add_argument_group('required arguments')
+# parser = argparse.ArgumentParser(description="This program generates the corresponding README file for GeneLab amplicon processed datasets. \
+#                                              Hard-coded variables that may need to be changed are at the top \
+#                                              of the script. It is expected to be run after `GL-validate-amplicon` has\
+#                                              been run successfully.")
 
-required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store")
-parser.add_argument("--output", help='Name of output file (default: "README.txt", with appended prefix if one is provided)', default="README.txt")
-parser.add_argument("--name", help='Name of individual who performed the processing (default: "Michael D. Lee")', default="Michael D. Lee")
-parser.add_argument("--email", help='Email address of individual who performed the processing (default: "Mike.Lee@nasa.gov")', default="Mike.Lee@nasa.gov")
-parser.add_argument("--protocol-ID", help='Protocol document ID followed (default: "GL-DPPD-7104-A")', default="GL-DPPD-7104-A")
-parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
-                    therefore there are no trimmed sequence data.", action="store_true")
-parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
-parser.add_argument("--raw-reads-dir", help = "Specify location of raw reads directory if they are to be included", action = "store", default = "")
+# required = parser.add_argument_group('required arguments')
 
+# required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-276")', action="store")
+# parser.add_argument("--output", help='Name of output file (default: "README.txt", with appended prefix if one is provided)', default="README.txt")
+# parser.add_argument("--name", help='Name of individual who performed the processing (default: "Michael D. Lee")', default="Michael D. Lee")
+# parser.add_argument("--email", help='Email address of individual who performed the processing (default: "Mike.Lee@nasa.gov")', default="Mike.Lee@nasa.gov")
+# parser.add_argument("--protocol-ID", help='Protocol document ID followed (default: "GL-DPPD-7104-A")', default="GL-DPPD-7104-A")
+# parser.add_argument("--primers-already-trimmed", help="Add this flag if primers were trimmed prior to GeneLab processing, \
+#                     therefore there are no trimmed sequence data.", action="store_true")
+# parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
+# parser.add_argument("--raw-reads-dir", help = "Specify location of raw reads directory if they are to be included", action = "store", default = "")
 
-if len(sys.argv)==1:
-    parser.print_help(sys.stderr)
-    sys.exit(0)
 
-args = parser.parse_args()
+# if len(sys.argv)==1:
+#     parser.print_help(sys.stderr)
+#     sys.exit(0)
 
+# args = parser.parse_args()
 
-additional_prefix = str(args.additional_prefix)
 
-output_file = additional_prefix + str(args.output)
+# additional_prefix = str(args.additional_prefix)
 
-### hard-coded stuff we might want to change ###
-# raw_reads_dir = "Raw_Sequence_Data/"
-fastqc_dir = "FastQC_Outputs/"
-trimmed_reads_dir = "Trimmed_Sequence_Data/"
-filtered_reads_dir = "Filtered_Sequence_Data/"
-final_outputs_dir = "Final_Outputs/"
+# output_file = additional_prefix + str(args.output)
 
+# ### hard-coded stuff we might want to change ###
+# # raw_reads_dir = "Raw_Sequence_Data/"
+# fastqc_dir = "FastQC_Outputs/"
+# trimmed_reads_dir = "Trimmed_Sequence_Data/"
+# filtered_reads_dir = "Filtered_Sequence_Data/"
+# final_outputs_dir = "Final_Outputs/"
 
-processing_zip_file = additional_prefix + "processing_info.zip"
+# processing_zip_file = additional_prefix + "processing_info.zip"
 
-expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
+# expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
 
-################################################################################
+# ################################################################################
 
-def main():
+# def main():
 
-    check_expected_directories()
+#     check_expected_directories()
 
-    processing_zip_contents = get_processing_zip_contents()
+#     processing_zip_contents = get_processing_zip_contents()
 
-    with open(output_file, "w") as output:
+#     with open(output_file, "w") as output:
 
-        write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
+#         write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
 
-        write_body(output, processing_zip_contents)
+#         write_body(output, processing_zip_contents)
 
-        output.write("\n")
+#         output.write("\n")
 
-################################################################################
+# ################################################################################
 
-def write_header(output, GLDS_ID, name, email, protocol_ID):
+# def write_header(output, GLDS_ID, name, email, protocol_ID):
 
-    header = ["################################################################################\n",
-              "{:<77} {:>0}".format("## This directory holds processed data for NASA " + str(GLDS_ID), "##\n"),
-              "{:<77} {:>0}".format("## https://genelab-data.ndc.nasa.gov/genelab/accession/" + str(GLDS_ID) + "/", "##\n"),
-              "{:<77} {:>0}".format("##", "##\n"),
-              "{:<77} {:>0}".format("## Processed by " + str(name) + " (" + str(email) + ")", "##\n"),
-              "{:<77} {:>0}".format("## Based on " + str(protocol_ID),  "##\n"),
-              "################################################################################\n\n",
-              "Summary of contents:\n\n"]
+#     header = ["################################################################################\n",
+#               "{:<77} {:>0}".format("## This directory holds processed data for NASA " + str(GLDS_ID), "##\n"),
+#               "{:<77} {:>0}".format("## https://genelab-data.ndc.nasa.gov/genelab/accession/" + str(GLDS_ID) + "/", "##\n"),
+#               "{:<77} {:>0}".format("##", "##\n"),
+#               "{:<77} {:>0}".format("## Processed by " + str(name) + " (" + str(email) + ")", "##\n"),
+#               "{:<77} {:>0}".format("## Based on " + str(protocol_ID),  "##\n"),
+#               "################################################################################\n\n",
+#               "Summary of contents:\n\n"]
 
-    output.writelines(header)
+#     output.writelines(header)
 
 
-def write_body(output, processing_zip_contents):
+# def write_body(output, processing_zip_contents):
 
-    # this file
-    output.write("    {:<41} {:>0}".format("- " + str(output_file), "- this file\n\n"))
+#     # this file
+#     output.write("    {:<41} {:>0}".format("- " + str(output_file), "- this file\n\n"))
 
-    # fastqc info
-    output.write("    {:<41} {:>0}".format("- " + str(fastqc_dir), "- multiQC summary reports of FastQC runs\n\n"))
+#     # fastqc info
+#     output.write("    {:<41} {:>0}".format("- " + str(fastqc_dir), "- multiQC summary reports of FastQC runs\n\n"))
 
-    # raw reads
-    if args.raw_reads_dir != "":
-        output.write("    {:<41} {:>0}".format("- " + str(args.raw_reads_dir), "- initial read fastq files\n\n"))
+#     # raw reads
+#     if args.raw_reads_dir != "":
+#         output.write("    {:<41} {:>0}".format("- " + str(args.raw_reads_dir), "- initial read fastq files\n\n"))
 
-    # primer-trimmed reads if there are any
-    if not args.primers_already_trimmed:
-        output.write("    {:<41} {:>0}".format("- " + str(trimmed_reads_dir), "- primer-trimmed fastq files\n\n"))
+#     # primer-trimmed reads if there are any
+#     if not args.primers_already_trimmed:
+#         output.write("    {:<41} {:>0}".format("- " + str(trimmed_reads_dir), "- primer-trimmed fastq files\n\n"))
 
-    # quality-filtered reads
-    output.write("    {:<41} {:>0}".format("- " + str(filtered_reads_dir), "- quality-filtered fastq files\n\n"))
+#     # quality-filtered reads
+#     output.write("    {:<41} {:>0}".format("- " + str(filtered_reads_dir), "- quality-filtered fastq files\n\n"))
 
-    # outputs
-    output.write("    {:<41} {:>0}".format("- " + str(final_outputs_dir), "- primary output files (may or may not have additional prefix)\n"))
-    output.write("        {:<37} {:>0}".format("- *.fasta", "- fasta file of recovered sequences\n"))
-    output.write("        {:<37} {:>0}".format("- *counts.tsv", "- count table of sequences across samples\n"))
-    output.write("        {:<37} {:>0}".format("- *taxonomy.tsv", "- assigned taxonomy of recovered sequences\n"))
-    output.write("        {:<37} {:>0}".format("- *taxonomy-and-count.tsv", "- combined table of counts and taxonomy\n"))
-    output.write("        {:<37} {:>0}".format("- *taxonomy-and-count.biom.zip", "- biom-formatted output of counts and taxonomy\n"))
-    output.write("        {:<37} {:>0}".format("- *read-count-tracking.tsv", "- read counts at each processing step\n\n"))
+#     # outputs
+#     output.write("    {:<41} {:>0}".format("- " + str(final_outputs_dir), "- primary output files (may or may not have additional prefix)\n"))
+#     output.write("        {:<37} {:>0}".format("- *.fasta", "- fasta file of recovered sequences\n"))
+#     output.write("        {:<37} {:>0}".format("- *counts.tsv", "- count table of sequences across samples\n"))
+#     output.write("        {:<37} {:>0}".format("- *taxonomy.tsv", "- assigned taxonomy of recovered sequences\n"))
+#     output.write("        {:<37} {:>0}".format("- *taxonomy-and-count.tsv", "- combined table of counts and taxonomy\n"))
+#     output.write("        {:<37} {:>0}".format("- *taxonomy-and-count.biom.zip", "- biom-formatted output of counts and taxonomy\n"))
+#     output.write("        {:<37} {:>0}".format("- *read-count-tracking.tsv", "- read counts at each processing step\n\n"))
 
-    # processing info
-    output.write("    {:<41} {:>0}".format("- " + str(processing_zip_file), "- zip archive holding info related to processing\n"))
-    for item in processing_zip_contents:
+#     # processing info
+#     output.write("    {:<41} {:>0}".format("- " + str(processing_zip_file), "- zip archive holding info related to processing\n"))
+#     for item in processing_zip_contents:
 
-        num_levels = item.count("/")
+#         num_levels = item.count("/")
 
-        if num_levels > 1 and not item.endswith("/"):
-            out_item = re.sub(r'^.*/', '', str(item))
-        elif num_levels == 1 and not item.endswith("/"):
-            out_item = re.sub(r'^.*/', '', str(item))
-        elif num_levels > 1:
-            out_item = re.sub(r'^[^/]*/', '', str(item))
-        else:
-            out_item = str(item)
+#         if num_levels > 1 and not item.endswith("/"):
+#             out_item = re.sub(r'^.*/', '', str(item))
+#         elif num_levels == 1 and not item.endswith("/"):
+#             out_item = re.sub(r'^.*/', '', str(item))
+#         elif num_levels > 1:
+#             out_item = re.sub(r'^[^/]*/', '', str(item))
+#         else:
+#             out_item = str(item)
 
-        if item.endswith('/'):
-            num_levels -= 1
+#         if item.endswith('/'):
+#             num_levels -= 1
 
-        num_spaces = num_levels * 4
+#         num_spaces = num_levels * 4
 
-        output.write("        " + " " * num_spaces + "- " + out_item + "\n")
+#         output.write("        " + " " * num_spaces + "- " + out_item + "\n")
 
 
-# setting some colors
-tty_colors = {
-    'green' : '\033[0;32m%s\033[0m',
-    'yellow' : '\033[0;33m%s\033[0m',
-    'red' : '\033[0;31m%s\033[0m'
-}
+# # setting some colors
+# tty_colors = {
+#     'green' : '\033[0;32m%s\033[0m',
+#     'yellow' : '\033[0;33m%s\033[0m',
+#     'red' : '\033[0;31m%s\033[0m'
+# }
 
 
-### functions ###
-def color_text(text, color='green'):
-    if sys.stdout.isatty():
-        return tty_colors[color] % text
-    else:
-        return text
+# ### functions ###
+# def color_text(text, color='green'):
+#     if sys.stdout.isatty():
+#         return tty_colors[color] % text
+#     else:
+#         return text
 
 
-def wprint(text):
-    """ print wrapper """
+# def wprint(text):
+#     """ print wrapper """
 
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
-          subsequent_indent="  ", break_on_hyphens=False))
+#     print(textwrap.fill(text, width=80, initial_indent="  ", 
+#           subsequent_indent="  ", break_on_hyphens=False))
 
 
-def report_failure(message, color = "yellow"):
-    print("")
-    wprint(color_text(message, color))
-    print("\nREADME generation failed.\n")
-    sys.exit(1)
+# def report_failure(message, color = "yellow"):
+#     print("")
+#     wprint(color_text(message, color))
+#     print("\nREADME generation failed.\n")
+#     sys.exit(1)
 
 
-def check_expected_directories():
-    """ checks expected directories exist """
+# def check_expected_directories():
+#     """ checks expected directories exist """
 
-    expected_dirs = [fastqc_dir, filtered_reads_dir, final_outputs_dir]
+#     expected_dirs = [fastqc_dir, filtered_reads_dir, final_outputs_dir]
 
-    if args.raw_reads_dir != "":
+#     if args.raw_reads_dir != "":
 
-        expected_dirs.append(args.raw_reads_dir)
+#         expected_dirs.append(args.raw_reads_dir)
 
-    if not args.primers_already_trimmed:
+#     if not args.primers_already_trimmed:
 
-        expected_dirs.append(trimmed_reads_dir)
+#         expected_dirs.append(trimmed_reads_dir)
 
-    for directory in expected_dirs:
-        if not os.path.isdir(directory):
+#     for directory in expected_dirs:
+#         if not os.path.isdir(directory):
 
-            report_failure("The directory '" + str(directory) + "' was expected but not found.")
+#             report_failure("The directory '" + str(directory) + "' was expected but not found.")
 
 
-def check_for_file_and_contents(file_path):
-    """ used by get_processing_zip_contents function """
+# def check_for_file_and_contents(file_path):
+#     """ used by get_processing_zip_contents function """
 
-    if not os.path.exists(file_path):
-        report_failure("The expected file '" + str(file_path) + "' does not exist.")
-    if not os.path.getsize(file_path) > 0:
-        report_failure("The file '" + str(file_path) + "' is empty.")
+#     if not os.path.exists(file_path):
+#         report_failure("The expected file '" + str(file_path) + "' does not exist.")
+#     if not os.path.getsize(file_path) > 0:
+#         report_failure("The file '" + str(file_path) + "' is empty.")
 
 
-def get_processing_zip_contents():
-    """ this gets the filenames that are in the processing_info.zip to add them to the readme """
+# def get_processing_zip_contents():
+#     """ this gets the filenames that are in the processing_info.zip to add them to the readme """
 
-    check_for_file_and_contents(processing_zip_file)
+#     check_for_file_and_contents(processing_zip_file)
 
-    with zipfile.ZipFile(processing_zip_file) as zip_obj:
+#     with zipfile.ZipFile(processing_zip_file) as zip_obj:
 
-        entries = zip_obj.namelist()
-        entries.sort()
-
-    return(entries)
-
-
-# def get_processing_tar_contents():
-#     """ this gets the filenames that are in the processing_info.tar to add them to the readme """
-
-#     check_for_file_and_contents(processing_tar_file)
-
-#     with tarfile.open(processing_tar_file) as tar_obj:
-# #        entries = [os.path.basename(entry) for entry in tar_obj.getnames()][1:]
-# #        entries = [os.path.basename(entry) for entry in tar_obj.getnames()]
-#         entries = tar_obj.getnames()
+#         entries = zip_obj.namelist()
 #         entries.sort()
 
 #     return(entries)
 
 
-if __name__ == "__main__":
-    main()
+# # def get_processing_tar_contents():
+# #     """ this gets the filenames that are in the processing_info.tar to add them to the readme """
+
+# #     check_for_file_and_contents(processing_tar_file)
+
+# #     with tarfile.open(processing_tar_file) as tar_obj:
+# # #        entries = [os.path.basename(entry) for entry in tar_obj.getnames()][1:]
+# # #        entries = [os.path.basename(entry) for entry in tar_obj.getnames()]
+# #         entries = tar_obj.getnames()
+# #         entries.sort()
+
+# #     return(entries)
+
+
+# if __name__ == "__main__":
+#     main()

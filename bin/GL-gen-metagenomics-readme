@@ -1,167 +1,170 @@
 #!/usr/bin/env python
 
-"""
-This is a program for generating the README.txt file for GeneLab Illumina metagenomic processed datasets.
-"""
+print("\n  This program has been deprecated, please see `GL-gen-processed-data-readme`.\n")
+exit()
 
-import os
-import sys
-import argparse
-import textwrap
-import tarfile
+# """
+# This is a program for generating the README.txt file for GeneLab Illumina metagenomic processed datasets.
+# """
 
-
-parser = argparse.ArgumentParser(description="This program generates the corresponding README file for GeneLab Illumina metagenomics processed datasets. \
-                                             Hard-coded variables that may need to be changed are at the top \
-                                             of the script. It is expected to be run after `GL-validate-metagenomics` has\
-                                             been run successfully.")
-
-required = parser.add_argument_group('required arguments')
-
-required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-69")', action="store")
-parser.add_argument("--output", help='Name of output file (default: "README.txt", with appended prefix if one is provided)', default="README.txt")
-parser.add_argument("--name", help='Name of individual who performed the processing (default: "Michael D. Lee")', default="Michael D. Lee")
-parser.add_argument("--email", help='Email address of individual who performed the processing (default: "Mike.Lee@nasa.gov")', default="Mike.Lee@nasa.gov")
-parser.add_argument("--protocol-ID", help='Protocol document ID followed (default: "GL-DPPD-7107")', default="GL-DPPD-7107")
-parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
+# import os
+# import sys
+# import argparse
+# import textwrap
+# import tarfile
 
 
-if len(sys.argv)==1:
-    parser.print_help(sys.stderr)
-    sys.exit(0)
+# parser = argparse.ArgumentParser(description="This program generates the corresponding README file for GeneLab Illumina metagenomics processed datasets. \
+#                                              Hard-coded variables that may need to be changed are at the top \
+#                                              of the script. It is expected to be run after `GL-validate-metagenomics` has\
+#                                              been run successfully.")
 
-args = parser.parse_args()
+# required = parser.add_argument_group('required arguments')
 
-additional_prefix = str(args.additional_prefix)
-
-output_file = additional_prefix + str(args.output)
-
-### hard-coded stuff we might want to change ###
-raw_reads_dir = "Raw_Sequence_Data/"
-fastqc_dir = "FastQC_Outputs/"
-filtered_reads_dir = "Filtered_Sequence_Data/"
-
-assembly_based_dir = "Assembly-based_Processing/"
-assemblies_dir = "assemblies/"
-genes_dir = "predicted-genes/"
-annotations_and_tax_dir = "annotations-and-taxonomy/"
-mapping_dir = "read-mapping/"
-combined_output_dir = "combined-outputs/"
-bins_dir = "bins/"
-MAGs_dir = "MAGs/"
-read_based_dir = "Read-based_Processing/"
-
-processing_tar_file = additional_prefix + "processing_info.tar"
-
-################################################################################
-
-def main():
-
-    with open(output_file, "w") as output:
-
-        write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
-
-        write_body(output)
-
-        output.write("\n")
-
-################################################################################
-
-def write_header(output, GLDS_ID, name, email, protocol_ID):
-
-    header = ["################################################################################\n",
-              "{:<77} {:>0}".format("## This directory holds processed data for NASA " + str(GLDS_ID), "##\n"),
-              "{:<77} {:>0}".format("## https://genelab-data.ndc.nasa.gov/genelab/accession/" + str(GLDS_ID) + "/", "##\n"),
-              "{:<77} {:>0}".format("##", "##\n"),
-              "{:<77} {:>0}".format("## Processed by " + str(name) + " (" + str(email) + ")", "##\n"),
-              "{:<77} {:>0}".format("## Based on " + str(protocol_ID),  "##\n"),
-              "################################################################################\n\n",
-              "Summary of contents:\n\n"]
-
-    output.writelines(header)
+# required.add_argument("-g", "--GLDS-ID", help='GLDS ID (e.g. "GLDS-69")', action="store")
+# parser.add_argument("--output", help='Name of output file (default: "README.txt", with appended prefix if one is provided)', default="README.txt")
+# parser.add_argument("--name", help='Name of individual who performed the processing (default: "Michael D. Lee")', default="Michael D. Lee")
+# parser.add_argument("--email", help='Email address of individual who performed the processing (default: "Mike.Lee@nasa.gov")', default="Mike.Lee@nasa.gov")
+# parser.add_argument("--protocol-ID", help='Protocol document ID followed (default: "GL-DPPD-7107")', default="GL-DPPD-7107")
+# parser.add_argument("--additional-prefix", help="Add any expected additional filename prefix that was added to the files that describe multiple samples (default: \"\")", default = "", action="store")
 
 
-def write_body(output):
+# if len(sys.argv)==1:
+#     parser.print_help(sys.stderr)
+#     sys.exit(0)
 
-    # this file
-    output.write("    {:<63} {:>0}".format("- " + str(output_file), "- this file\n\n"))
+# args = parser.parse_args()
 
-    # fastqc info
-    output.write("    {:<63} {:>0}".format("- " + str(fastqc_dir), "- multiQC summary reports of FastQC runs\n\n"))
+# additional_prefix = str(args.additional_prefix)
 
-    # raw reads
-    output.write("    {:<63} {:>0}".format("- " + str(raw_reads_dir), "- initial read fastq files\n\n"))
+# output_file = additional_prefix + str(args.output)
 
-    # quality-filtered reads
-    output.write("    {:<63} {:>0}".format("- " + str(filtered_reads_dir), "- quality-filtered fastq files\n\n"))
+# ### hard-coded stuff we might want to change ###
+# raw_reads_dir = "Raw_Sequence_Data/"
+# fastqc_dir = "FastQC_Outputs/"
+# filtered_reads_dir = "Filtered_Sequence_Data/"
 
-    # outputs
-    output.write("    {:<63} {:>0}".format("- " + str(assembly_based_dir), "- results generated from assembly-based approach\n\n"))
+# assembly_based_dir = "Assembly-based_Processing/"
+# assemblies_dir = "assemblies/"
+# genes_dir = "predicted-genes/"
+# annotations_and_tax_dir = "annotations-and-taxonomy/"
+# mapping_dir = "read-mapping/"
+# combined_output_dir = "combined-outputs/"
+# bins_dir = "bins/"
+# MAGs_dir = "MAGs/"
+# read_based_dir = "Read-based_Processing/"
 
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + str("Assembly-based-processing-overview.tsv"), "- Assembly-based overview per sample\n\n"))
+# processing_zip_file = additional_prefix + "processing_info.zip"
+
+# ################################################################################
+
+# def main():
+
+#     with open(output_file, "w") as output:
+
+#         write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
+
+#         write_body(output)
+
+#         output.write("\n")
+
+# ################################################################################
+
+# def write_header(output, GLDS_ID, name, email, protocol_ID):
+
+#     header = ["################################################################################\n",
+#               "{:<77} {:>0}".format("## This directory holds processed data for NASA " + str(GLDS_ID), "##\n"),
+#               "{:<77} {:>0}".format("## https://genelab-data.ndc.nasa.gov/genelab/accession/" + str(GLDS_ID) + "/", "##\n"),
+#               "{:<77} {:>0}".format("##", "##\n"),
+#               "{:<77} {:>0}".format("## Processed by " + str(name) + " (" + str(email) + ")", "##\n"),
+#               "{:<77} {:>0}".format("## Based on " + str(protocol_ID),  "##\n"),
+#               "################################################################################\n\n",
+#               "Summary of contents:\n\n"]
+
+#     output.writelines(header)
+
+
+# def write_body(output):
+
+#     # this file
+#     output.write("    {:<63} {:>0}".format("- " + str(output_file), "- this file\n\n"))
+
+#     # fastqc info
+#     output.write("    {:<63} {:>0}".format("- " + str(fastqc_dir), "- multiQC summary reports of FastQC runs\n\n"))
+
+#     # raw reads
+#     output.write("    {:<63} {:>0}".format("- " + str(raw_reads_dir), "- initial read fastq files\n\n"))
+
+#     # quality-filtered reads
+#     output.write("    {:<63} {:>0}".format("- " + str(filtered_reads_dir), "- quality-filtered fastq files\n\n"))
+
+#     # outputs
+#     output.write("    {:<63} {:>0}".format("- " + str(assembly_based_dir), "- results generated from assembly-based approach\n\n"))
+
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + str("Assembly-based-processing-overview.tsv"), "- Assembly-based overview per sample\n\n"))
     
-    output.write("        {:<59} {:>0}".format("- " + str(assemblies_dir), "- per-sample assembly files and info\n"))
-    output.write("            {:<55} {:>0}".format("- *-assembly.fasta", "- fasta files of individual sample assemblies\n"))
-    output.write("            {:<55} {:>0}".format("- " + additional_prefix + "assembly-summaries.tsv", "- table of all assemblies' summary statistics\n"))
-    output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Failed-assemblies.tsv", "- samples that didn't assemble any contigs (if any)\n\n"))
+#     output.write("        {:<59} {:>0}".format("- " + str(assemblies_dir), "- per-sample assembly files and info\n"))
+#     output.write("            {:<55} {:>0}".format("- *-assembly.fasta", "- fasta files of individual sample assemblies\n"))
+#     output.write("            {:<55} {:>0}".format("- " + additional_prefix + "assembly-summaries.tsv", "- table of all assemblies' summary statistics\n"))
+#     output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Failed-assemblies.tsv", "- samples that didn't assemble any contigs (if any)\n\n"))
 
-    output.write("        {:<59} {:>0}".format("- " + str(genes_dir), "- per-sample predicted gene files\n"))
-    output.write("            {:<55} {:>0}".format("- *.faa", "- gene amino-acid sequences\n"))
-    output.write("            {:<55} {:>0}".format("- *.fasta", "- gene nucleotide sequences\n"))
-    output.write("            {:<55} {:>0}".format("- *.gff", "- predicted genes in general feature format\n\n"))
+#     output.write("        {:<59} {:>0}".format("- " + str(genes_dir), "- per-sample predicted gene files\n"))
+#     output.write("            {:<55} {:>0}".format("- *.faa", "- gene amino-acid sequences\n"))
+#     output.write("            {:<55} {:>0}".format("- *.fasta", "- gene nucleotide sequences\n"))
+#     output.write("            {:<55} {:>0}".format("- *.gff", "- predicted genes in general feature format\n\n"))
 
-    output.write("        {:<59} {:>0}".format("- " + str(annotations_and_tax_dir), "- per-sample Kegg Orthology (KO) annotations, taxonomy, and coverages\n"))
-    output.write("            {:<55} {:>0}".format("- *-gene-coverage-annotation-tax.tsv", "- tables with gene coverage, annotation, and taxonomy info\n"))
-    output.write("            {:<55} {:>0}".format("- *-contig-coverage-and-tax.tsv", "- tables with contig coverage and taxonomy info\n\n"))
+#     output.write("        {:<59} {:>0}".format("- " + str(annotations_and_tax_dir), "- per-sample Kegg Orthology (KO) annotations, taxonomy, and coverages\n"))
+#     output.write("            {:<55} {:>0}".format("- *-gene-coverage-annotation-tax.tsv", "- tables with gene coverage, annotation, and taxonomy info\n"))
+#     output.write("            {:<55} {:>0}".format("- *-contig-coverage-and-tax.tsv", "- tables with contig coverage and taxonomy info\n\n"))
 
-    output.write("        {:<59} {:>0}".format("- " + str(mapping_dir), "- per-sample bam, coverage, and mapping info files\n"))
-    output.write("            {:<55} {:>0}".format("- *.bam", "- bam files\n"))
-    output.write("            {:<55} {:>0}".format("- *.tsv", "- coverage files used for metabat2 binning\n"))
-    output.write("            {:<55} {:>0}".format("- *.txt", "- stdout from bowtie2 mapping\n\n"))
+#     output.write("        {:<59} {:>0}".format("- " + str(mapping_dir), "- per-sample bam, coverage, and mapping info files\n"))
+#     output.write("            {:<55} {:>0}".format("- *.bam", "- bam files\n"))
+#     output.write("            {:<55} {:>0}".format("- *.tsv", "- coverage files used for metabat2 binning\n"))
+#     output.write("            {:<55} {:>0}".format("- *.txt", "- stdout from bowtie2 mapping\n\n"))
 
-    if os.path.exists(assembly_based_dir + bins_dir):
-        output.write("        {:<59} {:>0}".format("- " + str(bins_dir), "- genomic bins recovered (if any)\n"))
-        output.write("            {:<55} {:>0}".format("- *.fasta", "- fasta files of bins recovered\n"))
-        output.write("            {:<55} {:>0}".format("- " + additional_prefix + "bins-overview.tsv", "- summary stats of bins recovered\n\n"))
+#     if os.path.exists(assembly_based_dir + bins_dir):
+#         output.write("        {:<59} {:>0}".format("- " + str(bins_dir), "- genomic bins recovered (if any)\n"))
+#         output.write("            {:<55} {:>0}".format("- *.fasta", "- fasta files of bins recovered\n"))
+#         output.write("            {:<55} {:>0}".format("- " + additional_prefix + "bins-overview.tsv", "- summary stats of bins recovered\n\n"))
 
-    if os.path.exists(assembly_based_dir + MAGs_dir):
-        output.write("        {:<59} {:>0}".format("- " + str(MAGs_dir), "- high-quality Metagenome-Assembled Genomes recovered (if any; > 90% est. comp., < 10% est. redundancy)\n"))
-        output.write("            {:<55} {:>0}".format("- *.fasta", "- fasta files of MAGs\n"))
-        output.write("            {:<55} {:>0}".format("- " + additional_prefix + "MAGs-overview.tsv", "- summary stats of MAGs including GTDB taxonomy\n"))
-        output.write("            {:<55} {:>0}".format("- " + additional_prefix + "MAG-level-KO-annotations.tsv", "- KO functional annotations associated with each MAG\n"))
-        output.write("            {:<55} {:>0}".format("- " + additional_prefix + "MAG-KEGG-Decoder*", "- KEGG-Decoder summaries of MAG functional annotations\n\n"))
-
-
-    output.write("        {:<59} {:>0}".format("- " + str(combined_output_dir), "- summary outputs with all samples combined\n"))
-    output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-gene-level-KO-function-coverages.tsv", "- table of combined KO function coverages\n"))
-    output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-gene-level-KO-function-coverages-CPM.tsv", "- table of combined KO function coverages, normalized to coverage per million\n"))
-    output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-gene-level-taxonomy-coverages.tsv", "- table of combined, gene-level taxonomy coverages\n"))
-    output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-gene-level-taxonomy-coverages-CPM.tsv", "- table of combined, gene-level taxonomy coverages, normalized to coverage per million\n"))
-    output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-contig-level-taxonomy-coverages.tsv", "- table of combined, contig-level taxonomy coverages\n"))
-    output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-contig-level-taxonomy-coverages-CPM.tsv", "- table of combined, contig-level taxonomy coverages, normalized to coverage per million\n\n"))
-
-    output.write("    {:<63} {:>0}".format("- " + str(read_based_dir), "- results generated from read-based approach\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Gene-families.tsv", "- gene-family abundances\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Gene-families-grouped-by-taxa.tsv", "- gene-family abundances grouped by taxa\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Gene-families-cpm.tsv", "- gene-family abundances normalized to copies-per-million\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Gene-families-KO-cpm.tsv", "- KO term abundances normalized to copies-per-million\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-abundances.tsv", "- pathway abundances\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-abundances-grouped-by-taxa.tsv", "- pathway abundances grouped by taxa\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-abundances-cpm.tsv", "- pathway abundances normalized to copies-per-million\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-coverages.tsv", "- pathway coverages\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-coverages-grouped-by-taxa.tsv", "- pathway coverages grouped by taxa\n"))
-    output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Metaphlan-taxonomy.tsv", "- metaphlan estimated taxonomic relative abundances\n\n"))
-
-    # processing info
-    output.write("    {:<63} {:>0}".format("- " + str(processing_tar_file), "- tarball holding info related to processing\n"))
-    output.write("        {:<59} {:>0}".format("- unique-sample-IDs.txt", "- single-column file of unique sample identifiers\n"))
-    output.write("        {:<59} {:>0}".format("- Snakefile", "- Snakemake workflow file\n"))
-    output.write("        {:<59} {:>0}".format("- config.yaml", "- configuration file for workflow\n"))
-    output.write("        {:<59} {:>0}".format("- envs/", "- conda environments for workflow\n"))
-    output.write("        {:<59} {:>0}".format("- scripts/", "- scripts used by workflow\n"))
-    output.write("        {:<59} {:>0}".format("- logs/", "- log files of specific commands run\n"))
+#     if os.path.exists(assembly_based_dir + MAGs_dir):
+#         output.write("        {:<59} {:>0}".format("- " + str(MAGs_dir), "- high-quality Metagenome-Assembled Genomes recovered (if any; > 90% est. comp., < 10% est. redundancy)\n"))
+#         output.write("            {:<55} {:>0}".format("- *.fasta", "- fasta files of MAGs\n"))
+#         output.write("            {:<55} {:>0}".format("- " + additional_prefix + "MAGs-overview.tsv", "- summary stats of MAGs including GTDB taxonomy\n"))
+#         output.write("            {:<55} {:>0}".format("- " + additional_prefix + "MAG-level-KO-annotations.tsv", "- KO functional annotations associated with each MAG\n"))
+#         output.write("            {:<55} {:>0}".format("- " + additional_prefix + "MAG-KEGG-Decoder*", "- KEGG-Decoder summaries of MAG functional annotations\n\n"))
 
 
-if __name__ == "__main__":
-    main()
+#     output.write("        {:<59} {:>0}".format("- " + str(combined_output_dir), "- summary outputs with all samples combined\n"))
+#     output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-gene-level-KO-function-coverages.tsv", "- table of combined KO function coverages\n"))
+#     output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-gene-level-KO-function-coverages-CPM.tsv", "- table of combined KO function coverages, normalized to coverage per million\n"))
+#     output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-gene-level-taxonomy-coverages.tsv", "- table of combined, gene-level taxonomy coverages\n"))
+#     output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-gene-level-taxonomy-coverages-CPM.tsv", "- table of combined, gene-level taxonomy coverages, normalized to coverage per million\n"))
+#     output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-contig-level-taxonomy-coverages.tsv", "- table of combined, contig-level taxonomy coverages\n"))
+#     output.write("            {:<55} {:>0}".format("- " + additional_prefix + "Combined-contig-level-taxonomy-coverages-CPM.tsv", "- table of combined, contig-level taxonomy coverages, normalized to coverage per million\n\n"))
+
+#     output.write("    {:<63} {:>0}".format("- " + str(read_based_dir), "- results generated from read-based approach\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Gene-families.tsv", "- gene-family abundances\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Gene-families-grouped-by-taxa.tsv", "- gene-family abundances grouped by taxa\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Gene-families-cpm.tsv", "- gene-family abundances normalized to copies-per-million\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Gene-families-KO-cpm.tsv", "- KO term abundances normalized to copies-per-million\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-abundances.tsv", "- pathway abundances\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-abundances-grouped-by-taxa.tsv", "- pathway abundances grouped by taxa\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-abundances-cpm.tsv", "- pathway abundances normalized to copies-per-million\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-coverages.tsv", "- pathway coverages\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Pathway-coverages-grouped-by-taxa.tsv", "- pathway coverages grouped by taxa\n"))
+#     output.write("        {:<59} {:>0}".format("- " + additional_prefix + "Metaphlan-taxonomy.tsv", "- metaphlan estimated taxonomic relative abundances\n\n"))
+
+#     # processing info
+#     output.write("    {:<63} {:>0}".format("- " + str(processing_zip_file), "- zip archive holding info related to processing\n"))
+#     output.write("        {:<59} {:>0}".format("- unique-sample-IDs.txt", "- single-column file of unique sample identifiers\n"))
+#     output.write("        {:<59} {:>0}".format("- Snakefile", "- Snakemake workflow file\n"))
+#     output.write("        {:<59} {:>0}".format("- config.yaml", "- configuration file for workflow\n"))
+#     output.write("        {:<59} {:>0}".format("- envs/", "- conda environments for workflow\n"))
+#     output.write("        {:<59} {:>0}".format("- scripts/", "- scripts used by workflow\n"))
+#     output.write("        {:<59} {:>0}".format("- logs/", "- log files of specific commands run\n"))
+
+
+# if __name__ == "__main__":
+#     main()
 
