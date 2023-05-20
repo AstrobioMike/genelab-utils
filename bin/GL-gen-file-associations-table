@@ -161,6 +161,20 @@ def get_assay_table():
     return(assay_table)
 
 
+def parse_amplicon_names(name):
+    """ this removes expected prefixes and suffixes for amplicon assays """
+
+    # removing expected prefix
+    curr_name = name.replace(raw_file_prefix, "")
+
+    # removing potential suffixes (also checking R2 in case they are not in the appropriate order in the sample table, e.g. R2 before R1)
+    curr_name = curr_name.replace(raw_R1_suffix, "")
+    curr_name = curr_name.replace(raw_R2_suffix, "")
+    curr_name = curr_name.replace(raw_suffix, "")
+
+    return(curr_name)
+
+
 def get_sample_names_and_unique_filenames(assay_table):
     """
     This gets the sample names (first column) from the assay table,
@@ -178,6 +192,8 @@ def get_sample_names_and_unique_filenames(assay_table):
     # and also removing the common prefixes and suffixes intending to create the same 
     # unique filenames used for processing
 
+    # metagenomics will somethings have _HRremoved_ in the suffix and sometimes not in the assay table (for older datasets)
+    # so dealing with that here with a split
     if args.assay == "Amplicon":
 
         for entry in all_filenames:
@@ -185,18 +201,11 @@ def get_sample_names_and_unique_filenames(assay_table):
             # splitting if there are more than one (like with paired-end)
             curr_name = entry.split(",")[0]
 
-            # removing expected prefix
-            curr_name = curr_name.replace(raw_file_prefix, "")
-
-            # removing potential suffixes (also checking R2 in case they are not in the appropriate order in the sample table, e.g. R2 before R1)
-            curr_name = curr_name.replace(raw_R1_suffix, "")
-            curr_name = curr_name.replace(raw_R2_suffix, "")
-            curr_name = curr_name.replace(raw_suffix, "")
+            curr_name = parse_amplicon_names(curr_name)
 
             unique_filename_prefixes.append(curr_name)
 
-    # metagenomics will somethings have _HRremoved_ in the suffix and sometimes not in the assay table (for older datasets)
-    # so dealing with that here
+
     elif args.assay == "Metagenomics":
 
         # getting one file name so we can figure out which suffix is there
