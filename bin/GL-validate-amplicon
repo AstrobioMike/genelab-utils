@@ -1,378 +1,360 @@
 #!/usr/bin/env python
 
-"""
-This is a program for validating GeneLab amplicon processed datasets.
-"""
+print("\n  This program has been deprecated, please see `GL-validate-processed-data`.\n")
+exit()
 
-import os
-import sys
-import argparse
-import textwrap
-import pandas as pd
-import zipfile
-# import tarfile
+# """
+# This is a program for validating GeneLab amplicon processed datasets.
+# """
 
+# import os
+# import sys
+# import argparse
+# import textwrap
+# import pandas as pd
+# import zipfile
+# # import tarfile
 
-parser = argparse.ArgumentParser(description = "This program validates GeneLab amplicon processed datasets. \
-                                             Hard-coded variables that may need to be changed are near the top \
-                                             of the script.")
 
-required = parser.add_argument_group('required arguments')
+# parser = argparse.ArgumentParser(description = "This program validates GeneLab amplicon processed datasets. \
+#                                              Hard-coded variables that may need to be changed are near the top \
+#                                              of the script.")
 
-required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-276")', action = "store", required = True)
-required.add_argument("-s", "--sample-names-file", help = "Single-column file with unique sample names", action = "store", required = True)
-parser.add_argument("-p", "--output-prefix", help = "Output file prefix if there is one", action = "store", default = "")
-parser.add_argument("--primers-already-trimmed", help = "Add this flag if primers were trimmed prior to GeneLab processing, \
-                    therefore there are no trimmed sequence data.", action = "store_true")
-parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing.", action = "store_true")
-parser.add_argument("--raw-reads-dir", help = "Specify location of raw reads directory (when not included, existence of raw reads will not be checked)", 
-                    action = "store", default = "")
-parser.add_argument("--R1-used-as-single-ended-data", help = "Provide this flag if processing only R1 reads as single-end (as the expected raw filename suffixes will have 'R1' in there)", 
-                    action = "store_true")
+# required = parser.add_argument_group('required arguments')
 
+# required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-276")', action = "store", required = True)
+# required.add_argument("-s", "--sample-names-file", help = "Single-column file with unique sample names", action = "store", required = True)
+# parser.add_argument("-p", "--output-prefix", help = "Output additional file prefix if there is one", action = "store", default = "")
+# parser.add_argument("--primers-already-trimmed", help = "Add this flag if primers were trimmed prior to GeneLab processing, \
+#                     therefore there are no trimmed sequence data.", action = "store_true")
+# parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing.", action = "store_true")
+# parser.add_argument("--raw-reads-dir", help = "Specify location of raw reads directory (when not included, existence of raw reads will not be checked)", 
+#                     action = "store", default = "")
+# parser.add_argument("--R1-used-as-single-ended-data", help = "Provide this flag if processing only R1 reads as single-end (as the expected raw filename suffixes will have 'R1' in there)", 
+#                     action = "store_true")
 
+# if len(sys.argv)==1:
+#     parser.print_help(sys.stderr)
+#     sys.exit(0)
 
-if len(sys.argv)==1:
-    parser.print_help(sys.stderr)
-    sys.exit(0)
+# args = parser.parse_args()
 
-args = parser.parse_args()
 
+# ### hard-coded stuff we might want to change ###
+# # raw_reads_dir = "Raw_Sequence_Data/"
+# fastqc_dir = "FastQC_Outputs/"
+# trimmed_reads_dir = "Trimmed_Sequence_Data/"
+# filtered_reads_dir = "Filtered_Sequence_Data/"
+# final_outputs_dir = "Final_Outputs/"
 
-### hard-coded stuff we might want to change ###
-# raw_reads_dir = "Raw_Sequence_Data/"
-fastqc_dir = "FastQC_Outputs/"
-trimmed_reads_dir = "Trimmed_Sequence_Data/"
-filtered_reads_dir = "Filtered_Sequence_Data/"
-final_outputs_dir = "Final_Outputs/"
 
+# raw_suffix = "_raw.fastq.gz"
+# raw_R1_suffix = "_R1_raw.fastq.gz"
+# raw_R2_suffix = "_R2_raw.fastq.gz"
+# if args.R1_used_as_single_ended_data:
+#     raw_suffix = raw_R1_suffix = "_R1_raw.fastq.gz"
 
-raw_suffix = "_raw.fastq.gz"
-raw_R1_suffix = "_R1_raw.fastq.gz"
-raw_R2_suffix = "_R2_raw.fastq.gz"
-if args.R1_used_as_single_ended_data:
-    raw_suffix = raw_R1_suffix = "_R1_raw.fastq.gz"
+# primer_trimmed_suffix = "_trimmed.fastq.gz"
+# primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
+# primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
+# filtered_suffix = "_filtered.fastq.gz"
+# filtered_R1_suffix = "_R1_filtered.fastq.gz"
+# filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
-primer_trimmed_suffix = "_trimmed.fastq.gz"
-primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
-primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
-filtered_suffix = "_filtered.fastq.gz"
-filtered_R1_suffix = "_R1_filtered.fastq.gz"
-filtered_R2_suffix = "_R2_filtered.fastq.gz"
+# processing_zip_file = "processing_info.zip"
 
-processing_zip_file = "processing_info.zip"
+# if args.output_prefix:
+#     processing_zip_file = args.output_prefix + "processing_info.zip"
 
-if args.output_prefix:
-    processing_zip_file = args.output_prefix + "processing_info.zip"
+# expected_trimmed_outputs_or_suffixes = [str(args.output_prefix) + "cutadapt.log", str(args.output_prefix) + "trimmed-read-counts.tsv"]
+# expected_filtered_outputs_or_suffixes = ["filtered-read-counts.tsv"]
+# expected_final_outputs_or_suffixes = [".fasta", str(args.output_prefix) + "counts.tsv", str(args.output_prefix) + "taxonomy.tsv", ".biom.zip", str(args.output_prefix) + "taxonomy-and-counts.tsv", str(args.output_prefix) + "read-count-tracking.tsv"]
 
-expected_trimmed_outputs_or_suffixes = [str(args.output_prefix) + "cutadapt.log", str(args.output_prefix) + "trimmed-read-counts.tsv"]
-expected_filtered_outputs_or_suffixes = ["filtered-read-counts.tsv"]
-expected_final_outputs_or_suffixes = [".fasta", str(args.output_prefix) + "counts.tsv", str(args.output_prefix) + "taxonomy.tsv", ".biom.zip", str(args.output_prefix) + "taxonomy-and-counts.tsv", str(args.output_prefix) + "read-count-tracking.tsv"]
+# validation_log = str(args.GLDS_ID) + "_" + str(args.output_prefix) + "amplicon-validation.log"
 
-validation_log = str(args.GLDS_ID) + "_" + str(args.output_prefix) + "amplicon-validation.log"
+# ################################################################################
 
-################################################################################
+# def main():
 
-def main():
+#     check_expected_directories()
 
-    check_expected_directories()
+#     sample_names = read_samples(args.sample_names_file)
 
-    sample_names = read_samples(args.sample_names_file)
+#     check_fastq_files(sample_names)
 
-    check_fastq_files(sample_names)
+#     check_multiqc_outputs(sample_names)
 
-    check_multiqc_outputs(sample_names)
+#     check_intermediate_log_files()
 
-    check_intermediate_log_files()
+#     check_final_outputs()
 
-    check_final_outputs()
+#     check_for_processing_zip()
 
-    check_for_processing_zip()
+#     report_success()
 
-    report_success()
+# ################################################################################
 
-################################################################################
+# # setting some colors
+# tty_colors = {
+#     'green' : '\033[0;32m%s\033[0m',
+#     'yellow' : '\033[0;33m%s\033[0m',
+#     'red' : '\033[0;31m%s\033[0m'
+# }
 
-# setting some colors
-tty_colors = {
-    'green' : '\033[0;32m%s\033[0m',
-    'yellow' : '\033[0;33m%s\033[0m',
-    'red' : '\033[0;31m%s\033[0m'
-}
 
+# ### functions ###
+# def color_text(text, color='green'):
+#     if sys.stdout.isatty():
+#         return tty_colors[color] % text
+#     else:
+#         return text
 
-### functions ###
-def color_text(text, color='green'):
-    if sys.stdout.isatty():
-        return tty_colors[color] % text
-    else:
-        return text
 
+# def wprint(text):
+#     """ print wrapper """
 
-def wprint(text):
-    """ print wrapper """
+#     print(textwrap.fill(text, width=80, initial_indent="  ",
+#           subsequent_indent="  ", break_on_hyphens=False))
 
-    print(textwrap.fill(text, width=80, initial_indent="  ",
-          subsequent_indent="  ", break_on_hyphens=False))
 
+# def report_failure(message, color = "yellow"):
+#     print("")
+#     wprint(color_text(message, color))
+#     print("\nValidation failed.\n")
 
-def report_failure(message, color = "yellow"):
-    print("")
-    wprint(color_text(message, color))
-    print("\nValidation failed.\n")
+#     with open(validation_log, "a") as log:
+#         log.write(message + "\n" + "Validation failed." + "\n\n")
 
-    with open(validation_log, "a") as log:
-        log.write(message + "\n" + "Validation failed." + "\n\n")
+#     sys.exit(1)
 
-    sys.exit(1)
 
+# def report_success():
+#     print("")
+#     wprint(color_text("Validation has completed successfully :)", "green"))
+#     print("")
 
-def report_success():
-    print("")
-    wprint(color_text("Validation has completed successfully :)", "green"))
-    print("")
+#     if not os.path.exists(validation_log) or os.path.getsize(validation_log) == 0:
 
-    if not os.path.exists(validation_log) or os.path.getsize(validation_log) == 0:
+#         with open(validation_log, "w") as log:
+#             log.write("   -----------------------------------------------------------------------------\n")
+#             log.write("                         Validation completed successfully." + "\n")
+#             log.write("   -----------------------------------------------------------------------------\n")
 
-        with open(validation_log, "w") as log:
-            log.write("   -----------------------------------------------------------------------------\n")
-            log.write("                         Validation completed successfully." + "\n")
-            log.write("   -----------------------------------------------------------------------------\n")
+#     else:
 
-    else:
+#         with open(validation_log, "a") as log:
+#             log.write("   -----------------------------------------------------------------------------\n")
+#             log.write("\tThe above were addressed and validation now completed successfully." + "\n")
+#             log.write("   -----------------------------------------------------------------------------\n")
 
-        with open(validation_log, "a") as log:
-            log.write("   -----------------------------------------------------------------------------\n")
-            log.write("\tThe above were addressed and validation now completed successfully." + "\n")
-            log.write("   -----------------------------------------------------------------------------\n")
 
-def check_expected_directories():
-    """ checks expected directories exist """
+# def check_expected_directories():
+#     """ checks expected directories exist """
 
-    expected_dirs = [fastqc_dir, filtered_reads_dir, final_outputs_dir]
+#     expected_dirs = [fastqc_dir, filtered_reads_dir, final_outputs_dir]
 
-    if args.raw_reads_dir != "":
+#     if args.raw_reads_dir != "":
 
-        expected_dirs.append(args.raw_reads_dir)
+#         expected_dirs.append(args.raw_reads_dir)
 
-    if not args.primers_already_trimmed:
+#     if not args.primers_already_trimmed:
 
-        expected_dirs.append(trimmed_reads_dir)
+#         expected_dirs.append(trimmed_reads_dir)
 
-    for directory in expected_dirs:
-        if not os.path.isdir(directory):
+#     for directory in expected_dirs:
+#         if not os.path.isdir(directory):
 
-            report_failure("The directory '" + str(directory) + "' was expected but not found.")
+#             report_failure("The directory '" + str(directory) + "' was expected but not found.")
 
 
-def read_samples(file_path):
-    """ reading unique sample names into list """
+# def read_samples(file_path):
+#     """ reading unique sample names into list """
 
-    with open(file_path) as f:
-        sample_names = f.read().splitlines()
+#     with open(file_path) as f:
+#         sample_names = f.read().splitlines()
 
-    return(sample_names)
+#     return(sample_names)
 
 
-def check_for_file_and_contents(file_path):
-    """ used by check_fastq_files and check_final_outputs functions """
+# def check_for_file_and_contents(file_path):
+#     """ used by check_fastq_files and check_final_outputs functions """
 
-    if not os.path.exists(file_path):
-        report_failure("The expected file '" + str(file_path) + "' does not exist.")
-    if not os.path.getsize(file_path) > 0:
-        report_failure("The file '" + str(file_path) + "' is empty.")
+#     if not os.path.exists(file_path):
+#         report_failure("The expected file '" + str(file_path) + "' does not exist.")
+#     if not os.path.getsize(file_path) > 0:
+#         report_failure("The file '" + str(file_path) + "' is empty.")
 
 
-def check_fastq_files(sample_names):
-    """ makes sure all expected read fastq files exist and hold something """
+# def check_fastq_files(sample_names):
+#     """ makes sure all expected read fastq files exist and hold something """
 
-    for sample in sample_names:
+#     for sample in sample_names:
 
-        ## if paired-end
-        if not args.single_ended:
+#         ## if paired-end
+#         if not args.single_ended:
 
-            ## raw
-            if args.raw_reads_dir != "":
-                check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_R1_suffix))
-                check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_R2_suffix))
+#             ## raw
+#             if args.raw_reads_dir != "":
+#                 check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_R1_suffix))
+#                 check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_R2_suffix))
 
-            ## trimmed if needed
-            if not args.primers_already_trimmed:
-                check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_R1_suffix)
-                check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_R2_suffix)
+#             ## trimmed if needed
+#             if not args.primers_already_trimmed:
+#                 check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_R1_suffix)
+#                 check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_R2_suffix)
 
-            ## filtered
-            check_for_file_and_contents(filtered_reads_dir + sample + filtered_R1_suffix)
-            check_for_file_and_contents(filtered_reads_dir + sample + filtered_R2_suffix)
+#             ## filtered
+#             check_for_file_and_contents(filtered_reads_dir + sample + filtered_R1_suffix)
+#             check_for_file_and_contents(filtered_reads_dir + sample + filtered_R2_suffix)
 
-        ## if single-end
-        else:
+#         ## if single-end
+#         else:
 
-            ## raw
-            if args.raw_reads_dir != "":
-                check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_suffix))
+#             ## raw
+#             if args.raw_reads_dir != "":
+#                 check_for_file_and_contents(os.path.join(args.raw_reads_dir, sample + raw_suffix))
 
-            ## trimmed if needed
-            if not args.primers_already_trimmed:
-                check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_suffix)
+#             ## trimmed if needed
+#             if not args.primers_already_trimmed:
+#                 check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_suffix)
 
-            ## filtered
-            check_for_file_and_contents(filtered_reads_dir + sample + filtered_suffix)
+#             ## filtered
+#             check_for_file_and_contents(filtered_reads_dir + sample + filtered_suffix)
 
 
-def check_multiqc_outputs(sample_names):
-    """ makes sure all samples' read files are in the multiqc outputs """
+# def check_multiqc_outputs(sample_names):
+#     """ makes sure all samples' read files are in the multiqc outputs """
 
-    # checking raw
-    raw_multiqc_data_path = fastqc_dir + str(args.output_prefix) + "raw_multiqc_data.zip"
-    check_for_file_and_contents(raw_multiqc_data_path)
-    zip_file = zipfile.ZipFile(raw_multiqc_data_path)
-    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
-    file_prefixes_in_multiqc = df["Sample"].tolist()
+#     # checking raw
+#     raw_multiqc_data_path = fastqc_dir + str(args.output_prefix) + "raw_multiqc_data.zip"
+#     check_for_file_and_contents(raw_multiqc_data_path)
+#     zip_file = zipfile.ZipFile(raw_multiqc_data_path)
+#     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+#     file_prefixes_in_multiqc = df["Sample"].tolist()
 
-    if not args.single_ended:
+#     if not args.single_ended:
 
-        R1_suffix = raw_R1_suffix.split(".")[0]
-        R2_suffix = raw_R2_suffix.split(".")[0]
+#         R1_suffix = raw_R1_suffix.split(".")[0]
+#         R2_suffix = raw_R2_suffix.split(".")[0]
 
-        for sample in sample_names:
-            if not sample + R1_suffix in file_prefixes_in_multiqc:
-                report_failure("The raw multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
-            if not sample + R2_suffix in file_prefixes_in_multiqc:
-                report_failure("The raw multiqc output is missing the expected '" + sample + R2_suffix + "' entry.")
+#         for sample in sample_names:
+#             if not sample + R1_suffix in file_prefixes_in_multiqc:
+#                 report_failure("The raw multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
+#             if not sample + R2_suffix in file_prefixes_in_multiqc:
+#                 report_failure("The raw multiqc output is missing the expected '" + sample + R2_suffix + "' entry.")
 
-    else:
+#     else:
 
-        suffix = raw_suffix.split(".")[0]
+#         suffix = raw_suffix.split(".")[0]
 
-        for sample in sample_names:
-            if not sample + suffix in file_prefixes_in_multiqc:
-                report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
+#         for sample in sample_names:
+#             if not sample + suffix in file_prefixes_in_multiqc:
+#                 report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
-    # checking filtered
-    filt_multiqc_data_path = fastqc_dir + str(args.output_prefix) + "filtered_multiqc_data.zip"
-    check_for_file_and_contents(filt_multiqc_data_path)
-    zip_file = zipfile.ZipFile(filt_multiqc_data_path)
-    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
-    file_prefixes_in_multiqc = df["Sample"].tolist()
+#     # checking filtered
+#     filt_multiqc_data_path = fastqc_dir + str(args.output_prefix) + "filtered_multiqc_data.zip"
+#     check_for_file_and_contents(filt_multiqc_data_path)
+#     zip_file = zipfile.ZipFile(filt_multiqc_data_path)
+#     df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+#     file_prefixes_in_multiqc = df["Sample"].tolist()
 
-    if not args.single_ended:
+#     if not args.single_ended:
 
-        R1_suffix = filtered_R1_suffix.split(".")[0]
-        R2_suffix = filtered_R2_suffix.split(".")[0]
-        for sample in sample_names:
-            if not sample + R1_suffix in file_prefixes_in_multiqc:
-                report_failure("The filtered multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
-            if not sample + R2_suffix in file_prefixes_in_multiqc:
-                report_failure("The filtered multiqc output is missing the expected '" + sample + R2_suffix + "' entry.")
+#         R1_suffix = filtered_R1_suffix.split(".")[0]
+#         R2_suffix = filtered_R2_suffix.split(".")[0]
+#         for sample in sample_names:
+#             if not sample + R1_suffix in file_prefixes_in_multiqc:
+#                 report_failure("The filtered multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
+#             if not sample + R2_suffix in file_prefixes_in_multiqc:
+#                 report_failure("The filtered multiqc output is missing the expected '" + sample + R2_suffix + "' entry.")
 
-    else:
+#     else:
 
-        suffix = filtered_suffix.split(".")[0]
-        for sample in sample_names:
-            if not sample + suffix in file_prefixes_in_multiqc:
-                report_failure("The filtered multiqc output is missing the expected '" + sample + suffix + "' entry.")
+#         suffix = filtered_suffix.split(".")[0]
+#         for sample in sample_names:
+#             if not sample + suffix in file_prefixes_in_multiqc:
+#                 report_failure("The filtered multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
 
-def check_general_fasta_format(file_path):
+# def check_general_fasta_format(file_path):
 
-    line_num = 0
-    num_headers = 0
-    num_seqs = 0
+#     line_num = 0
+#     num_headers = 0
+#     num_seqs = 0
 
-    with open(file_path) as in_file:
+#     with open(file_path) as in_file:
 
-        for line in in_file:
+#         for line in in_file:
 
-            # keeping track of current line for reporting any problems
-            line_num += 1
+#             # keeping track of current line for reporting any problems
+#             line_num += 1
 
-            if line.strip().startswith(">"):
-                num_headers += 1
-            else:
-                num_seqs += 1
+#             if line.strip().startswith(">"):
+#                 num_headers += 1
+#             else:
+#                 num_seqs += 1
 
-            if num_headers != num_seqs + 1 and num_headers != num_seqs:
-                report_failure("Fasta file '" + str(file_path) + "' does not seem to be formatted properly. Problem detected at line " + str(line_num) + ".")
+#             if num_headers != num_seqs + 1 and num_headers != num_seqs:
+#                 report_failure("Fasta file '" + str(file_path) + "' does not seem to be formatted properly. Problem detected at line " + str(line_num) + ".")
 
 
-def get_files_in_dir(dir_path):
+# def get_files_in_dir(dir_path):
 
-    return([f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))])
+#     return([f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))])
 
 
-def check_intermediate_log_files():
+# def check_intermediate_log_files():
 
-    ## trimmed if needed
-    if not args.primers_already_trimmed:
+#     ## trimmed if needed
+#     if not args.primers_already_trimmed:
 
-        output_files_present = get_files_in_dir(trimmed_reads_dir)
+#         output_files_present = get_files_in_dir(trimmed_reads_dir)
 
-        for entry in expected_trimmed_outputs_or_suffixes:
+#         for entry in expected_trimmed_outputs_or_suffixes:
 
-            if not any(output_file.endswith(entry) for output_file in output_files_present):
-                report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(trimmed_reads_dir) + ".")
+#             if not any(output_file.endswith(entry) for output_file in output_files_present):
+#                 report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(trimmed_reads_dir) + ".")
 
-    ## filtered
-    output_files_present = get_files_in_dir(filtered_reads_dir)
+#     ## filtered
+#     output_files_present = get_files_in_dir(filtered_reads_dir)
 
-    for entry in expected_filtered_outputs_or_suffixes:
+#     for entry in expected_filtered_outputs_or_suffixes:
 
-        if not any(output_file.endswith(entry) for output_file in output_files_present):
-            report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(filtered_reads_dir) + ".")
+#         if not any(output_file.endswith(entry) for output_file in output_files_present):
+#             report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(filtered_reads_dir) + ".")
 
 
-def check_final_outputs():
-    """ makes sure outputs exist and checks formatting """
+# def check_final_outputs():
+#     """ makes sure outputs exist and checks formatting """
 
-    # getting list of files in output dir
-    output_files_present = get_files_in_dir(final_outputs_dir)
+#     # getting list of files in output dir
+#     output_files_present = get_files_in_dir(final_outputs_dir)
 
-    # making sure none of them are empty
-    for output_file in output_files_present:
-        check_for_file_and_contents(final_outputs_dir + output_file)
+#     # making sure none of them are empty
+#     for output_file in output_files_present:
+#         check_for_file_and_contents(final_outputs_dir + output_file)
 
-    # checking all desired output types exist
-    for entry in expected_final_outputs_or_suffixes:
+#     # checking all desired output types exist
+#     for entry in expected_final_outputs_or_suffixes:
 
-        if not any(output_file.endswith(entry) for output_file in output_files_present):
-            report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(final_outputs_dir) + ".")
+#         if not any(output_file.endswith(entry) for output_file in output_files_present):
+#             report_failure("An output file named or ending with '" + str(entry) + "' was expected but not found in " + str(final_outputs_dir) + ".")
 
-    # checking general fasta format is met
-    fasta_files_in_output_dir = [output_file for output_file in output_files_present if output_file.endswith(".fasta")]
+#     # checking general fasta format is met
+#     fasta_files_in_output_dir = [output_file for output_file in output_files_present if output_file.endswith(".fasta")]
 
-    for fasta_file in fasta_files_in_output_dir:
-        check_general_fasta_format(final_outputs_dir + fasta_file)
+#     for fasta_file in fasta_files_in_output_dir:
+#         check_general_fasta_format(final_outputs_dir + fasta_file)
 
 
-def check_for_processing_zip():
-    """ this just makes sure a processing zip exists and at least has the Snakefile, as its contents can vary quite a bit """
+# def check_for_processing_zip():
+#     """ this just makes sure a processing zip exists and at least has the Snakefile, as its contents can vary quite a bit """
 
-    check_for_file_and_contents(processing_zip_file)
+#     check_for_file_and_contents(processing_zip_file)
 
-    with zipfile.ZipFile(processing_zip_file) as zip_obj:
+#     with zipfile.ZipFile(processing_zip_file) as zip_obj:
 
-        entries = zip_obj.namelist()
-
-    target_substring = str(args.output_prefix).rstrip("-") + "/Snakefile"
-
-    base_target = "/Snakefile"
-
-    if not any(target_substring.lower() in string.lower() for string in entries):
-
-        if not any(base_target.lower() in string.lower() for string in entries):
-    
-            report_failure("The '" + processing_zip_file + "' does not have a 'Snakefile' as expected.")
-
-
-# def check_for_processing_tar():
-#     """ this just makes sure a processing tar exists and at least has the Snakefile, as its contents can vary quite a bit """
-
-#     check_for_file_and_contents(processing_tar_file)
-
-#     with tarfile.open(processing_tar_file) as tar_obj:
-
-#         entries = tar_obj.getnames()
+#         entries = zip_obj.namelist()
 
 #     target_substring = str(args.output_prefix).rstrip("-") + "/Snakefile"
 
@@ -382,7 +364,27 @@ def check_for_processing_zip():
 
 #         if not any(base_target.lower() in string.lower() for string in entries):
     
-#             report_failure("The '" + processing_tar_file + "' does not have a 'Snakefile' as expected.")
+#             report_failure("The '" + processing_zip_file + "' does not have a 'Snakefile' as expected.")
 
-if __name__ == "__main__":
-    main()
+
+# # def check_for_processing_tar():
+# #     """ this just makes sure a processing tar exists and at least has the Snakefile, as its contents can vary quite a bit """
+
+# #     check_for_file_and_contents(processing_tar_file)
+
+# #     with tarfile.open(processing_tar_file) as tar_obj:
+
+# #         entries = tar_obj.getnames()
+
+# #     target_substring = str(args.output_prefix).rstrip("-") + "/Snakefile"
+
+# #     base_target = "/Snakefile"
+
+# #     if not any(target_substring.lower() in string.lower() for string in entries):
+
+# #         if not any(base_target.lower() in string.lower() for string in entries):
+    
+# #             report_failure("The '" + processing_tar_file + "' does not have a 'Snakefile' as expected.")
+
+# if __name__ == "__main__":
+#     main()
