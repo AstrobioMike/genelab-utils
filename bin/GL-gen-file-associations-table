@@ -215,13 +215,16 @@ def get_sample_names_and_unique_filenames(assay_table):
 
             if one_entry.endswith(older_raw_suffix):
 
+                global raw_suffix
                 raw_suffix = older_raw_suffix
 
         else:
 
             if one_entry.endswith(older_raw_R1_suffix):
 
+                global raw_R1_suffix
                 raw_R1_suffix = older_raw_R1_suffix
+                global raw_R2_suffix
                 raw_R2_suffix = older_raw_R2_suffix
 
 
