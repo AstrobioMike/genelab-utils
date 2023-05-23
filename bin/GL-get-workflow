@@ -27,7 +27,8 @@ required.add_argument('workflow', choices = ['MG-Illumina',
                                            'MG-estimate-host-reads',
                                            'Amplicon-Illumina',
                                            'Amplicon-454-IonTorrent',
-                                           'RNAseq'], 
+                                           'RNAseq',
+                                           'MethylSeq'], 
                                            help = "The first positional argument should be which one of these workflows you'd like to download")
 
 parser.add_argument("--wanted-version", help = "Specify the version you'd like to download (leaving out this argument will pull the latest by default)")
@@ -41,14 +42,22 @@ args = parser.parse_args()
 
 ### variables we'd likely want to adjust first ###
 
-base_repo = "https://github.com/nasa/GeneLab_Data_Processing/"
+### right now, the methylseq workflow is only available from my dev repo (as staging is private), will be updated after going through SRS process
+if args.workflow == "MethylSeq":
 
-base_download_link = base_repo + "releases/download/"
-# base_download_link = base_repo + "archive/refs/tags/"
-# releases_page_link = base_repo + "releases"
-releases_page_link = "https://api.github.com/repos/nasa/GeneLab_Data_Processing/releases"
+    base_repo = "https://github.com/astrobiomike/GL-MethylSeq-WF-dev/"
 
-# tags_page_link = base_repo + "tags"
+    base_download_link = base_repo + "releases/download/"
+    releases_page_link = "https://api.github.com/repos/astrobiomike/GL-MethylSeq-WF-dev/releases"
+
+
+else:
+
+    base_repo = "https://github.com/nasa/GeneLab_Data_Processing/"
+
+    base_download_link = base_repo + "releases/download/"
+    releases_page_link = "https://api.github.com/repos/nasa/GeneLab_Data_Processing/releases"
+
 
 # core workflow info
 workflow_dict = {
@@ -58,7 +67,8 @@ workflow_dict = {
     "MG-estimate-host-reads": { "basename": "SW_MGEstHostReads" },
     "Amplicon-Illumina": { "basename": "SW_AmpIllumina-A" },
     "Amplicon-454-IonTorrent": { "basename": "SW_Amp454IonTor" },
-    "RNAseq": { "basename": "NF_RCP-F" }
+    "RNAseq": { "basename": "NF_RCP-F" },
+    "MethylSeq": { "basename": "NF_MethylSeq" }
 
 }
 
