@@ -22,13 +22,13 @@ parser = argparse.ArgumentParser(description = "This is a helper program for dow
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument('workflow', choices = ['MG-Illumina', 
-                                           'MG-remove-human-reads', 
+required.add_argument('workflow', choices = ['MG-Illumina',
+                                           'MG-remove-human-reads',
                                            'MG-estimate-host-reads',
                                            'Amplicon-Illumina',
                                            'Amplicon-454-IonTorrent',
                                            'RNAseq',
-                                           'MethylSeq'], 
+                                           'MethylSeq'],
                                            help = "The first positional argument should be which one of these workflows you'd like to download")
 
 parser.add_argument("--wanted-version", help = "Specify the version you'd like to download (leaving out this argument will pull the latest by default)")
@@ -110,14 +110,14 @@ def get_versions_available(target_wf) -> list:
 
     """ this finds which versions are available on the release page and returns them as a list """
 
-    # accessing release page in json format    
+    # accessing release page in json format
     releases_data = json.loads(urlopen(releases_page_link).read())
 
     # getting all links available
     links = []
     for item in releases_data:
         links.append(item['html_url'])
-    
+
     # starting empty list of available versions
     available_versions = []
 
@@ -132,7 +132,7 @@ def get_versions_available(target_wf) -> list:
                 # cutting out just the version info
                 link_basename = os.path.basename(link)
                 link_version = link_basename.replace(target_wf + "_", "").replace(".zip", "")
-                
+
                 # adding to list
                 available_versions.append(link_version)
 
@@ -166,28 +166,43 @@ def check_if_dir_already_exists(dir_name):
         print("\n    Please rename or remove it first.")
         print("\n  Exiting for now.\n")
         exit(1)
-        
+
 
 def download_and_unzip(target_link):
 
     """ this downloads and unzips the target workflow """
 
+    # python module zipfile does not retain permissions (see https://github.com/python/cpython/issues/59999 and https://github.com/python/cpython/pull/32289) 
+    # this was messing up places where files were expected to come in as executables, this was the old way
+    # # downloading
+    # target = requests.get(target_link)
+
+    # # extracting zip
+    # zip = zipfile.ZipFile(BytesIO(target.content))
+    # zip.extractall()
+
+    # now doing it with the system zip (that's part of genelab-utils) to retain permissions
+
+    # getting base filename
+    base_zip = os.path.basename(target_link)
+
     # downloading
     target = requests.get(target_link)
 
-    # extracting zip
-    zip = zipfile.ZipFile(BytesIO(target.content))
-    zip.extractall()
+    # writing out
+    with open(base_zip, "wb") as downloaded_zip:
 
-    downloaded_basename = os.path.basename(target_link).replace(".zip", "")
+        downloaded_zip.write(target.content)
 
-    # os.rename("GeneLab_Data_Processing" + "-" + downloaded_basename, downloaded_basename)
+    # extracting zip and removing archive
+    os.system(f"unzip -q {base_zip}")
+    os.remove(base_zip)
+
+    downloaded_basename = base_zip.replace(".zip", "")
 
     report_message(f"The {args.workflow} workflow was downloaded to '{downloaded_basename}/'", "green")
 
     print(f"\n    It was pulled from this release page:\n         {releases_page_link}\n")
-    
-    # print(f"\n    It was pulled from this location:\n         {tags_page_link}\n")
 
 
 def dl_wf(target_wf):
