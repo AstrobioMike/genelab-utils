@@ -191,8 +191,8 @@ def check_multiqc_outputs(sample_names):
     """ makes sure all samples' read files are in the multiqc outputs """
 
     # checking raw
-    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + "raw_multiqc_data.zip")
-    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + raw_multiqc_zip)
+    df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
     if not args.single_ended:
@@ -215,8 +215,8 @@ def check_multiqc_outputs(sample_names):
                 report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
     # checking filtered
-    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + "filtered_multiqc_data.zip")
-    df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + filtered_multiqc_zip)
+    df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
     if not args.single_ended:
@@ -591,7 +591,11 @@ def check_metagenomics_processing_zip(samples):
 # universal settings
 output_prefix = str(args.output_prefix)
 fastqc_dir = "FastQC_Outputs/"
+raw_multiqc_zip = "raw_multiqc_report.zip"
+filtered_multiqc_zip = "filtered_multiqc_report.zip"
 processing_zip_file = output_prefix + "processing_info.zip"
+
+
 
 # setting up when assay is amplicon
 if args.assay == "Amplicon":
