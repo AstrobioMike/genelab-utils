@@ -280,14 +280,14 @@ def get_read_counts_from_raw_multiqc(sample_names, mapping_tab):
         # working through each one
         for prefix in unique_prefixes:
 
-            curr_file_path = fastqc_dir + output_prefix + prefix + "-raw_multiqc_data.zip"
+            curr_file_path = fastqc_dir + output_prefix + prefix + raw_multiqc_zip
 
             # making sure there are multiqc files for each unique prefix given in the mapping table
             check_for_file_and_contents(curr_file_path)
 
             # reading in
             zip_file = zipfile.ZipFile(curr_file_path)
-            curr_df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+            curr_df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
             curr_df.columns = ["sample", "counts"]
             curr_df.set_index("sample", inplace = True)
 
@@ -300,8 +300,8 @@ def get_read_counts_from_raw_multiqc(sample_names, mapping_tab):
         return(df)
 
     else:
-        zip_file = zipfile.ZipFile(fastqc_dir + output_prefix + "raw_multiqc_data.zip")
-        df = pd.read_csv(zip_file.open("multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+        zip_file = zipfile.ZipFile(fastqc_dir + output_prefix + raw_multiqc_zip)
+        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
         df.columns = ["sample", "counts"]
         df.set_index("sample", inplace = True)
 
@@ -346,11 +346,10 @@ def gen_and_write_out_amplicon_filenames_table(unique_filename_prefixes, mapping
 
     # entries and values that don't change per sample
     readme = file_prefix + output_prefix + "README.txt"
-    fastqc = [file_prefix + output_prefix + "raw_multiqc_data.zip", 
-              file_prefix + output_prefix + "raw_multiqc_report.html", 
-              file_prefix + output_prefix + "filtered_multiqc_data.zip", 
-              file_prefix + output_prefix + "filtered_multiqc_report.html"]
-    
+
+    fastqc = [file_prefix + output_prefix + raw_multiqc_zip, 
+              file_prefix + output_prefix + filtered_multiqc_zip]
+
     if args.type == "ASVs":
         rep_seq_output = file_prefix + output_prefix + "ASVs.fasta"
     else:
@@ -449,10 +448,9 @@ def gen_and_write_out_metagenomics_filenames_table(unique_filename_prefixes, map
 
     # entries that don't change per sample
     readme = file_prefix + output_prefix + "README.txt"
-    fastqc = [file_prefix + output_prefix + "raw_multiqc_data.zip", 
-              file_prefix + output_prefix + "raw_multiqc_report.html", 
-              file_prefix + output_prefix + "filtered_multiqc_data.zip", 
-              file_prefix + output_prefix + "filtered_multiqc_report.html"]
+
+    fastqc = [file_prefix + output_prefix + raw_multiqc_zip, 
+              file_prefix + output_prefix + filtered_multiqc_zip]
 
     assembly_overview_tab = file_prefix + output_prefix + "Assembly-based-processing-overview.tsv"
 
@@ -601,6 +599,8 @@ filtered_reads_dir = "Filtered_Sequence_Data/"
 filtered_suffix = "_filtered.fastq.gz"
 filtered_R1_suffix = "_R1_filtered.fastq.gz"
 filtered_R2_suffix = "_R2_filtered.fastq.gz"
+raw_multiqc_zip = "raw_multiqc_report.zip"
+filtered_multiqc_zip = "filtered_multiqc_report.zip"
 
 
 if args.assay == "Amplicon":
