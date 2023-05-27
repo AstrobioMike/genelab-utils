@@ -35,6 +35,10 @@ parser.add_argument("--map", help = 'Mapping file if samples come from more than
 parser.add_argument("-p", "--output-prefix", help = "Output additional file prefix if there is one", action = "store", default = "")
 parser.add_argument("--R1-used-as-single-ended-data", help = "Provide this flag if processing only R1 reads as single-end (as the expected raw filename suffixes will have 'R1' in there)", 
                     action = "store_true")
+parser.add_argument("--include-raw-multiqc-in-output", help = "Provide this flag if wanting to include the raw multiqc zip in the file-associations output table (may be wanted for older datasets)", 
+                    action = "store_true")
+
+                    
 
 
 if len(sys.argv)==1:
@@ -347,8 +351,14 @@ def gen_and_write_out_amplicon_filenames_table(unique_filename_prefixes, mapping
     # entries and values that don't change per sample
     readme = file_prefix + output_prefix + "README.txt"
 
-    fastqc = [file_prefix + output_prefix + raw_multiqc_zip, 
-              file_prefix + output_prefix + filtered_multiqc_zip]
+    if args.include_raw_multiqc_in_output:
+
+        fastqc = [file_prefix + output_prefix + raw_multiqc_zip, 
+                  file_prefix + output_prefix + filtered_multiqc_zip]
+
+    else:
+
+        fastqc = [file_prefix + output_prefix + filtered_multiqc_zip]
 
     if args.type == "ASVs":
         rep_seq_output = file_prefix + output_prefix + "ASVs.fasta"
@@ -449,8 +459,15 @@ def gen_and_write_out_metagenomics_filenames_table(unique_filename_prefixes, map
     # entries that don't change per sample
     readme = file_prefix + output_prefix + "README.txt"
 
-    fastqc = [file_prefix + output_prefix + raw_multiqc_zip, 
-              file_prefix + output_prefix + filtered_multiqc_zip]
+    if args.include_raw_multiqc_in_output:
+
+        fastqc = [file_prefix + output_prefix + raw_multiqc_zip, 
+                  file_prefix + output_prefix + filtered_multiqc_zip]
+
+    else:
+
+        fastqc = [file_prefix + output_prefix + filtered_multiqc_zip]
+
 
     assembly_overview_tab = file_prefix + output_prefix + "Assembly-based-processing-overview.tsv"
 
