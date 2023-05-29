@@ -5,9 +5,13 @@ Some helper programs for [NASA GeneLab](https://genelab.nasa.gov/), such as `GL-
 ---
 
 ## Conda install
+The genelab-utils package should be installed with conda/mamba. If you are not familiar with conda, you can find an introduction [here](https://astrobiomike.github.io/unix/conda-intro) if wanted, and if you are not familiar with mamba, there is a super-short introduction on that same page [here](https://astrobiomike.github.io/unix/conda-intro#bonus-mamba-no-5) if wanted – it's definitely worth using mamba if you use conda at all :+1: 
 
 ```bash
-conda create -n genelab-utils -c conda-forge -c bioconda -c defaults -c astrobiomike genelab-utils
+conda install -c conda-forge -n base mamba
+
+mamba create -n genelab-utils -c conda-forge -c bioconda -c defaults -c astrobiomike genelab-utils
+
 conda activate genelab-utils
 ```
 
@@ -21,4 +25,5 @@ All programs are prefixed with `GL-` and have a help menu accessible with `-h`. 
 - Downloading GeneLab workflows
   - [`GL-get-workflow`](https://hackmd.io/@astrobiomike/using-genelab-utils-to-download-workflows)  
 
+---
 ---
