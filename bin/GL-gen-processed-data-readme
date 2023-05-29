@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description = "This program generates the corre
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-a", "--assay", choices = ['Amplicon', 'Metagenomics'], 
+required.add_argument("-a", "--assay", choices = ['Amplicon', 'Metagenomics', 'MethylSeq'], 
                       help = "Specifies which datatype (assay) this is for", action = "store", required = True)
 
 required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-69")', action = "store", required = True)
@@ -40,6 +40,7 @@ args = parser.parse_args()
 
 latest_amplicon_DPPD = "GL-DPPD-7104-A"
 latest_metagenomics_DPPD = "GL-DPPD-7107"
+latest_methylseq_DPPD = "GL-DPPD-7113"
 
 ################################################################################
 
@@ -51,7 +52,7 @@ def main():
 
         with open(output_file, "w") as output:
 
-            write_amplicon_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
+            write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
 
             write_amplicon_body(output, processing_zip_contents)
 
@@ -60,9 +61,19 @@ def main():
 
         with open(output_file, "w") as output:
 
-            write_metagenomics_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
+            write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
 
             write_metagenomics_body(output)
+
+
+    elif args.assay == "MethylSeq":
+
+        with open(output_file, "w") as output:
+
+            write_header(output, args.GLDS_ID, args.name, args.email, args.protocol_ID)
+
+            write_methylseq_body(output)
+
 
 ################################################################################
 
@@ -119,7 +130,7 @@ def get_processing_zip_contents():
     return(entries)
 
 
-def write_amplicon_header(output, GLDS_ID, name, email, protocol_ID):
+def write_header(output, GLDS_ID, name, email, protocol_ID):
 
     header = ["################################################################################\n",
               "{:<77} {:>0}".format("## This directory holds processed data for NASA " + str(GLDS_ID), "##\n"),
@@ -184,20 +195,6 @@ def write_amplicon_body(output, processing_zip_contents):
         output.write("        " + " " * num_spaces + "- " + out_item + "\n")
 
     output.write("\n")
-
-
-def write_metagenomics_header(output, GLDS_ID, name, email, protocol_ID):
-
-    header = ["################################################################################\n",
-              "{:<77} {:>0}".format("## This directory holds processed data for NASA " + str(GLDS_ID), "##\n"),
-              "{:<77} {:>0}".format("## https://genelab-data.ndc.nasa.gov/genelab/accession/" + str(GLDS_ID) + "/", "##\n"),
-              "{:<77} {:>0}".format("##", "##\n"),
-              "{:<77} {:>0}".format("## Processed by " + str(name) + " (" + str(email) + ")", "##\n"),
-              "{:<77} {:>0}".format("## Based on " + str(protocol_ID),  "##\n"),
-              "################################################################################\n\n",
-              "Summary of contents:\n\n"]
-
-    output.writelines(header)
 
 
 def write_metagenomics_body(output):
@@ -284,12 +281,40 @@ def write_metagenomics_body(output):
     output.write("\n")
 
 
+def write_methylseq_body(output):
+
+    # this file
+    output.write("    {:<41} {:>0}".format("- " + str(output_file), "- this file\n\n"))
+
+    # fastqc info
+    output.write("    {:<41} {:>0}".format("- " + str(fastqc_dir), "- multiQC summary reports of FastQC runs\n\n"))
+
+    # quality-filtered reads
+    output.write("    {:<41} {:>0}".format("- " + str(filtered_reads_dir), "- quality-filtered and trimmed fastq files\n\n"))
+
+    # reference files
+    output.write("    {:<41} {:>0}".format("- " + str(ref_files_dir), "- reference genome files (including bed, gtf, and fasta)\n\n"))
+
+    # bismark index files
+    output.write("    {:<41} {:>0}".format("- " + str(bismark_index_zip), "- zip archive of bismark index files\n\n"))
+
+    # bismark methylation calls
+    output.write("    {:<41} {:>0}".format("- " + str(bismark_meth_calls_dir), "- methylation-call files and logs from bismark_methylation_extractor\n\n"))
+
+    # bismark summary files
+    output.write("    {:<41} {:>0}".format("- " + str(bismark_summary_dir), "- bismark summary reports and html files\n\n"))
+
+    # processing info
+    output.write("    {:<41} {:>0}".format("- " + str(processing_zip_file), "- zip archive holding info related to processing (workflow files and metadata)\n"))
+
+    output.write("\n")
 
 ### variable setup ###
 
 # universal settings
 output_prefix = str(args.output_prefix)
 fastqc_dir = "FastQC_Outputs/"
+filtered_reads_dir = "Filtered_Sequence_Data/"
 processing_zip_file = output_prefix + "processing_info.zip"
 
 output_file = output_prefix + str(args.output)
@@ -297,7 +322,6 @@ output_file = output_prefix + str(args.output)
 if args.assay == "Amplicon":
 
     trimmed_reads_dir = "Trimmed_Sequence_Data/"
-    filtered_reads_dir = "Filtered_Sequence_Data/"
     final_outputs_dir = "Final_Outputs/"
 
     if args.protocol_ID == "":
@@ -305,8 +329,6 @@ if args.assay == "Amplicon":
         args.protocol_ID = latest_amplicon_DPPD
 
 elif args.assay == "Metagenomics":
-
-    filtered_reads_dir = "Filtered_Sequence_Data/"
 
     assembly_based_dir = "Assembly-based_Processing/"
     assemblies_dir = "assemblies/"
@@ -321,6 +343,17 @@ elif args.assay == "Metagenomics":
     if args.protocol_ID == "":
 
         args.protocol_ID = latest_metagenomics_DPPD
+
+elif args.assay == "MethylSeq":
+    
+    ref_files_dir = "Reference_Genome_Files/"
+    bismark_index_zip = "Bismark_Index.zip"
+    bismark_meth_calls_dir = "Bismark_Methylation_Calls/"
+    bismark_summary_dir = "Bismark_Summary/"
+
+    if args.protocol_ID == "":
+
+        args.protocol_ID = latest_methylseq_DPPD
 
 
 if __name__ == "__main__":
