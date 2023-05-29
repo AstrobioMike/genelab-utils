@@ -1,6 +1,6 @@
 # GeneLab utils
 
-Helper programs for [NASA GeneLab](https://genelab.nasa.gov/). 
+Some helper programs for [NASA GeneLab](https://genelab.nasa.gov/), such as `GL-download-GLDS-data` for downloading files from a specific OSD or GLDS ID, and `GL-get-workflow` for downloading workflows used by [GeneLab for processing datasets](https://github.com/nasa/GeneLab_Data_Processing).
 
 ---
 
