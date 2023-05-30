@@ -298,6 +298,9 @@ def write_methylseq_body(output):
     # bismark index files
     output.write("    {:<41} {:>0}".format("- " + str(bismark_index_zip), "- zip archive of bismark index files\n\n"))
 
+    # bismark alignment files
+    output.write("    {:<41} {:>0}".format("- " + str(bismark_alignments_dir), "- bismark alignment files, logs, and qualimap reports\n\n"))
+
     # bismark methylation calls
     output.write("    {:<41} {:>0}".format("- " + str(bismark_meth_calls_dir), "- methylation-call files and logs from bismark_methylation_extractor\n\n"))
 
@@ -348,6 +351,7 @@ elif args.assay == "MethylSeq":
     
     ref_files_dir = "Reference_Genome_Files/"
     bismark_index_zip = "Bismark_Index.zip"
+    bismark_alignments_dir = "Bismark_Alignments/"
     bismark_meth_calls_dir = "Bismark_Methylation_Calls/"
     bismark_summary_dir = "Bismark_Summary/"
 
