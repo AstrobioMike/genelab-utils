@@ -10,18 +10,20 @@ import argparse
 import textwrap
 import pandas as pd
 import zipfile
+import re
+from statistics import mean, median
 
 
 parser = argparse.ArgumentParser(description = "This program validates GeneLab processed datasets, currently designed to work with \
-                                               metagenomics and amplicon datasets.")
+                                               Metagenomics, Amplicon, and MethylSeq datasets.")
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-a", "--assay", choices = ['Amplicon', 'Metagenomics'], 
+required.add_argument("-a", "--assay", choices = ['Amplicon', 'Metagenomics', 'MethylSeq'], 
                       help = "Specifies which datatype (assay) is to be validated", action = "store", required = True)
 
 required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-276")', action = "store", required = True)
-required.add_argument("-s", "--sample-names-file", help = "Single-column file with unique sample names", action = "store", required = True)
+required.add_argument("-s", "--sample-IDs-file", help = "Single-column file with unique file-name prefixes for each sample", action = "store", required = True)
 parser.add_argument("-p", "--output-prefix", help = "Output additional file prefix if there is one", action = "store", default = "")
 parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing.", action = "store_true")
 parser.add_argument("--primers-already-trimmed", help = "Add this flag if primers were trimmed prior to GeneLab processing, \
@@ -44,19 +46,30 @@ args = parser.parse_args()
 
 def main():
 
+    # initializing log file
+    setup_log()
+
+    check_for_file_and_contents(args.output_prefix + "README.txt")
+    append_message_to_log(f"    - populated {args.output_prefix + 'README.txt'} detected")
+
     check_expected_directories()
     
-    sample_names = read_samples(args.sample_names_file)
-
-    check_fastq_files(sample_names)
+    sample_names = read_samples(args.sample_IDs_file)
 
     check_multiqc_outputs(sample_names)
+    append_message_to_log(f"    - all expected samples found in raw and filtered multiqc files in {fastqc_dir}")
+
+    check_fastq_files(sample_names)
+    if args.assay == "Amplicon" and not args.primers_already_trimmed:
+        append_message_to_log(f"    - all expected read files found in {trimmed_reads_dir}")
+    append_message_to_log(f"    - all expected read files found in {filtered_reads_dir}")
 
     if args.assay == "Amplicon":
 
         check_amplicon_intermediate_log_files()
 
         check_amplicon_final_outputs()
+        append_message_to_log(f"    - all expected files found in the {final_outputs_dir} directory")
 
         check_amplicon_processing_zip()
 
@@ -67,14 +80,54 @@ def main():
         successful_assemblies_list = get_successful_assemblies(sample_names, failed_assemblies_list)
 
         check_assembly_based_outputs(sample_names, failed_assemblies_list, successful_assemblies_list)
+        append_message_to_log(f"    - all expected files found in the {assembly_based_dir} directory")
 
         check_assembly_based_overview_table(sample_names, assembly_based_overview_table)
 
         check_read_based_outputs(expected_read_based_outputs)
+        append_message_to_log(f"    - all expected files found in the {read_based_dir} directory")
 
         check_metagenomics_processing_zip(sample_names)
 
+    elif args.assay == "MethylSeq":
+
+        # checking for all expected files in bismark alignments directory
+        check_dir_for_file_patterns(bismark_alignments_dir, bismark_alignment_files_expected_suffixes, sample_names = sample_names)
+        append_message_to_log(f"    - all expected files found in the {bismark_alignments_dir} directory")
+
+        # checking for bismark index zip
+        check_for_file_and_contents(args.output_prefix + bismark_index_zip)
+        append_message_to_log(f"    - populated {args.output_prefix + bismark_index_zip} detected")
+
+        # checking for all expected files in bismark meth calls directory
+        check_dir_for_file_patterns(bismark_meth_calls_dir, bismark_meth_call_files_expected_suffixes, sample_names = sample_names, expected_prefixes = bismark_meth_call_files_expected_prefixes)
+        append_message_to_log(f"    - all expected files found in the {bismark_meth_calls_dir} directory")
+
+        # checking for all expected files in bismark summary dir
+        check_dir_for_files(bismark_summary_expected_files, bismark_summary_dir)
+        check_dir_for_file_patterns(bismark_individual_summaries_dir, [".html"], sample_names = sample_names)
+        append_message_to_log(f"    - all expected files found in the {bismark_summary_dir} directory")
+
+        # checking for all expected outputs in methylkit dir
+        check_dir_for_files(methylkit_expected_files, methylkit_dir)
+        append_message_to_log(f"    - all expected files found in the {methylkit_dir} directory")
+        
+        global num_contrasts
+        num_contrasts = check_methylkit_subdirectories()
+        append_message_to_log(f"        - all expected files found for the {num_contrasts} detected contrast(s) within the {methylkit_dir} directory")
+        
+        # checking for all expected files in the reference genome dir
+        check_dir_for_file_patterns(ref_files_dir, ref_files_expected_suffixes)
+        append_message_to_log(f"    - all expected files found in the {ref_files_dir} directory")
+
+
+    # checking for processing_info.zip
+    check_for_file_and_contents(processing_zip_file)
+    append_message_to_log(f"    - populated {processing_zip_file} detected")
+
     report_success()
+
+    get_read_count_stats()
 
 ################################################################################
 
@@ -97,39 +150,63 @@ def color_text(text, color='green'):
 def wprint(text):
     """ print wrapper """
 
-    print(textwrap.fill(text, width=80, initial_indent="  ", 
+    print(textwrap.fill(text, width = 80, initial_indent="  ", 
           subsequent_indent="  ", break_on_hyphens=False))
 
 
-def report_failure(message, color = "yellow"):
+def report_failure(message, color = "yellow", log = True):
     print("")
     wprint(color_text(message, color))
     print("\nValidation failed.\n")
 
-    with open(validation_log, "a") as log:
-        log.write(message + "\n" + "Validation failed." + "\n\n")
+    if log:
+        with open(validation_log, "a") as log:
+            log.write(message + "\n" + "Validation failed." + "\n\n")
 
     sys.exit(1)
+
+
+def setup_log():
+
+    with open(validation_log, "w") as log:
+        log.write(f"Performing baseline {args.assay} V+V as per: {V_V_guidelines_link}\n\n")
+
+
+def append_message_to_log(message):
+
+    with open(validation_log, "a") as log:
+        log.write(f"{message}\n\n")
+
+
+def add_to_log_table(col1, col2):
+
+    with open(validation_log, "a") as log:
+        log.write(f"{col1}\t{col2}\n")
 
 
 def report_success():
     print("")
     wprint(color_text("Validation has completed successfully :)", "green"))
-    print("")
+    print(f"\n  Log written to: '{validation_log}'\n")
 
-    if not os.path.exists(validation_log) or os.path.getsize(validation_log) == 0:
+    with open(validation_log, "a") as log:
 
-        with open(validation_log, "w") as log:
-            log.write("   -----------------------------------------------------------------------------\n")
-            log.write("                         Validation completed successfully." + "\n")
-            log.write("   -----------------------------------------------------------------------------\n")
+        log.write("   -----------------------------------------------------------------------------\n")
+        log.write("                         Validation completed successfully." + "\n")
+        log.write("   -----------------------------------------------------------------------------\n")
 
-    else:
+        # printing and writing to log file a message about the number of contrasts detected
+        if args.assay == "MethylSeq":
 
-        with open(validation_log, "a") as log:
-            log.write("   -----------------------------------------------------------------------------\n")
-            log.write("\tThe above were addressed and validation now completed successfully." + "\n")
-            log.write("   -----------------------------------------------------------------------------\n")
+            print("")
+            wprint(color_text("**NOTE**", "yellow"))
+            wprint(color_text(f"The number of contrast(s) detected was {num_contrasts}. Ensure that is correct by \
+                               checking against the appropriate assay table.", "yellow"))
+            print("")
+
+            log.write("\n  **NOTE**\n")
+            log.write(f"  The number of contrast(s) detected was {num_contrasts}. Ensure that is correct by \n")
+            log.write(f"  checking against the appropriate assay table.\n")
 
 
 def check_expected_directories():
@@ -151,7 +228,7 @@ def read_samples(file_path):
 
 
 def check_for_file_and_contents(file_path):
-    """ used by check_fastq_files and check_final_outputs functions """
+    """ used by various functions """
 
     if not os.path.exists(file_path):
         report_failure("The expected file '" + str(file_path) + "' does not exist.")
@@ -176,6 +253,12 @@ def check_fastq_files(sample_names):
             check_for_file_and_contents(filtered_reads_dir + sample + filtered_R1_suffix)
             check_for_file_and_contents(filtered_reads_dir + sample + filtered_R2_suffix)
 
+            ## trimmed if needed
+            if args.assay == "Amplicon" and not args.primers_already_trimmed:
+                check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_R1_suffix)
+                check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_R2_suffix)
+
+
         ## if single-end
         else:
 
@@ -186,13 +269,26 @@ def check_fastq_files(sample_names):
             ## filtered
             check_for_file_and_contents(filtered_reads_dir + sample + filtered_suffix)
 
+            ## trimmed if needed
+            if args.assay == "Amplicon" and not args.primers_already_trimmed:
+                check_for_file_and_contents(trimmed_reads_dir + sample + primer_trimmed_suffix)
+
 
 def check_multiqc_outputs(sample_names):
     """ makes sure all samples' read files are in the multiqc outputs """
 
     # checking raw
     zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + raw_multiqc_zip)
-    df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+
+    # methylseq workflow has these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
+    # right now, amplicon and metagenomics have raw_multiqc_report/multiqc_general_stats.txt
+    if args.assay == "MethylSeq":
+        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+
+    else:
+        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+
+
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
     if not args.single_ended:
@@ -211,12 +307,21 @@ def check_multiqc_outputs(sample_names):
         suffix = raw_suffix.split(".")[0]
 
         for sample in sample_names:
-            if not sample + suffix in file_prefixes_in_multiqc:
+            if not sample + suffix in file_prefixes_in_multiqc and not sample in file_prefixes_in_multiqc:
                 report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
     # checking filtered
     zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + filtered_multiqc_zip)
-    df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+
+    # methylseq workflow has these nested, e.g., filtered_multiqc_report/filtered_multiqc_data/multiqc_general_stats.txt
+    # right now, amplicon and metagenomics have filtered_multiqc_report/multiqc_general_stats.txt
+    if args.assay == "MethylSeq":
+        df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+
+    else:
+
+        df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
     if not args.single_ended:
@@ -233,7 +338,7 @@ def check_multiqc_outputs(sample_names):
 
         suffix = filtered_suffix.split(".")[0]
         for sample in sample_names:
-            if not sample + suffix in file_prefixes_in_multiqc:
+            if not sample + suffix in file_prefixes_in_multiqc and not sample in file_prefixes_in_multiqc:
                 report_failure("The filtered multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
 
@@ -276,6 +381,11 @@ def check_general_fasta_format(file_path):
 def get_files_in_dir(dir_path):
 
     return([f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))])
+
+
+def get_directories_in_dir(dir_path):
+
+    return([dir for dir in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, dir))])
 
 
 def check_amplicon_intermediate_log_files():
@@ -586,11 +696,162 @@ def check_metagenomics_processing_zip(samples):
                 report_failure("The '" + str(processing_zip_file) + "' does not have the '" + str(target_log) + "' log file as expected.")
 
 
+def check_dir_for_file_patterns(directory, expected_suffixes, sample_names = False, expected_prefixes = False):
+
+    """ this is exclusive to MethylSeq """
+
+    # getting all files in target dir
+    all_files = get_files_in_dir(directory)
+
+    # checking those with expected suffixes
+    if not sample_names:
+
+        for suffix in expected_suffixes:
+
+            hit = [ file for file in all_files if file.endswith(suffix) ]
+
+            if not hit:
+                report_failure(f"An expected file ending with '*{suffix}' was not found in the {directory} directory.")
+
+    else:
+
+        for sample_ID in sample_names:
+
+            curr_prefix = sample_ID + "_bismark"
+
+            curr_files = [ file for file in all_files if file.startswith(curr_prefix) ]
+
+            for suffix in expected_suffixes:
+
+                hit = [ file for file in curr_files if file.endswith(suffix) ]
+
+                if not hit:
+                    report_failure(f"An expected file ending with '*{suffix}' for sample '{sample_ID}' was not found in the {directory} directory.")
+
+    
+        if expected_prefixes:
+
+            # checking those with expected prefixes
+            for sample_ID in sample_names:
+
+                for prefix in expected_prefixes:
+
+                    curr_prefix = prefix + "_context_" + sample_ID + "_bismark"
+
+                    hit = [ file for file in all_files if file.startswith(curr_prefix) ]
+
+                    if not hit:
+                        report_failure(f"An expected file beginning with '{prefix}' for sample '{sample_ID}' was not found in the {directory} directory.")
+
+
+def check_dir_for_files(expected_files, directory):
+
+    # getting all files in target dir
+    all_files = get_files_in_dir(directory)
+
+    for file in expected_files:
+
+        if file not in all_files:
+
+            report_failure(f"The expected file '{file}' was not found in the {directory} directory.")
+
+
+def check_methylkit_subdirectories():
+
+    """ 
+    for every contrast subdirectory that exists, this checks the expected files are present
+    """
+
+    present_dirs = get_directories_in_dir(methylkit_dir)
+
+    num_contrasts = len(present_dirs)
+
+    for curr_directory in present_dirs:
+
+        check_dir_for_file_patterns(os.path.join(methylkit_dir, curr_directory), methylkit_subdir_expected_suffixes)
+
+    return(num_contrasts)
+
+
+def gen_stats(list_of_ints):
+
+    """ returns min, max, mean, median of input integer list """
+
+    min_val = min(list_of_ints)
+    max_val = max(list_of_ints)
+
+    mean_val = round(mean(list_of_ints), 2)
+    median_val = int(median(list_of_ints))
+    
+    return(min_val, max_val, mean_val, median_val)
+
+
+def get_read_count_stats():
+    
+    """ grabs read counts and summarizes """
+
+    # for raw
+    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + raw_multiqc_zip)
+
+    # methylseq workflow has these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
+    # right now, amplicon and metagenomics have raw_multiqc_report/multiqc_general_stats.txt
+    if args.assay == "MethylSeq":
+        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+
+    else:
+        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+
+    df.columns = ["counts"]
+    raw_counts = df.counts.tolist()
+
+    # getting rid of decimals
+    raw_counts = [ int(round(i, 0)) for i in raw_counts ]
+
+    raw_min, raw_max, raw_mean, raw_median = gen_stats(raw_counts)
+
+    # for filtered
+    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + filtered_multiqc_zip)
+
+    # methylseq workflow has these nested, e.g., filtered_multiqc_report/filtered_multiqc_data/multiqc_general_stats.txt
+    # right now, amplicon and metagenomics have filtered_multiqc_report/multiqc_general_stats.txt
+    if args.assay == "MethylSeq":
+        df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+
+    else:
+
+        df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+
+    df.columns = ["counts"]
+    filtered_counts = df.counts.tolist()
+
+    # getting rid of decimals
+    filtered_counts = [ int(round(i, 0)) for i in filtered_counts ]
+
+    filtered_min, filtered_max, filtered_mean, filtered_median = gen_stats(filtered_counts)
+
+    with open(validation_log, "a") as log:
+
+
+        log.write("\n  Raw read count summary:")
+        log.write("\n    {:<10} {:>0}".format("Min:", raw_min))
+        log.write("\n    {:<10} {:>0}".format("Max:", raw_max))
+        log.write("\n    {:<10} {:>0}".format("Mean:", raw_mean))
+        log.write("\n    {:<10} {:>0}".format("Median:", raw_median))
+
+        log.write("\n\n  Filtered read count summary:")
+        log.write("\n    {:<10} {:>0}".format("Min:", filtered_min))
+        log.write("\n    {:<10} {:>0}".format("Max:", filtered_max))
+        log.write("\n    {:<10} {:>0}".format("Mean:", filtered_mean))
+        log.write("\n    {:<10} {:>0}".format("Median:", filtered_median))
+        log.write("\n")
+
+
 ### variable setup ###
 
 # universal settings
 output_prefix = str(args.output_prefix)
 fastqc_dir = "FastQC_Outputs/"
+filtered_reads_dir = "Filtered_Sequence_Data/"
 raw_multiqc_zip = "raw_multiqc_report.zip"
 filtered_multiqc_zip = "filtered_multiqc_report.zip"
 processing_zip_file = output_prefix + "processing_info.zip"
@@ -600,8 +861,9 @@ processing_zip_file = output_prefix + "processing_info.zip"
 # setting up when assay is amplicon
 if args.assay == "Amplicon":
 
+    V_V_guidelines_link = "https://genelab-tools.arc.nasa.gov/confluence/pages/viewpage.action?pageId=2428598"
+
     trimmed_reads_dir = "Trimmed_Sequence_Data/"
-    filtered_reads_dir = "Filtered_Sequence_Data/"
     final_outputs_dir = "Final_Outputs/"
 
     raw_suffix = "_raw.fastq.gz"
@@ -637,7 +899,8 @@ if args.assay == "Amplicon":
 # setting up when assay is metagenomics
 elif args.assay == "Metagenomics":
 
-    filtered_reads_dir = "Filtered_Sequence_Data/"
+    V_V_guidelines_link = "https://genelab-tools.arc.nasa.gov/confluence/pages/viewpage.action?pageId=8225175"
+
     assembly_based_dir = "Assembly-based_Processing/"
     assemblies_dir = assembly_based_dir + "assemblies/"
     genes_dir = assembly_based_dir + "predicted-genes/"
@@ -697,6 +960,49 @@ elif args.assay == "Metagenomics":
                                 "-bbduk.log", "-kofamscan.log", "-pileup.log", "-prodigal.log", "-humann3-run.log"]
 
     validation_log = str(args.GLDS_ID) + "_" + output_prefix + "metagenomics-validation.log"
+
+
+# setting up when assay is methylseq
+elif args.assay == "MethylSeq":
+
+    V_V_guidelines_link = "https://genelab-tools.arc.nasa.gov/confluence/pages/viewpage.action?pageId=61865999"
+
+    ref_files_dir = "Reference_Genome_Files/"
+    bismark_alignments_dir = "Bismark_Alignments/"
+    bismark_meth_calls_dir = "Bismark_Methylation_Calls/"
+    bismark_summary_dir = "Bismark_Summary/"
+    methylkit_dir = "MethylKit_Outputs/"
+
+    bismark_index_zip = "Bismark_Index.zip"
+
+    expected_dirs = [fastqc_dir, filtered_reads_dir, ref_files_dir, bismark_alignments_dir,
+                     bismark_meth_calls_dir, bismark_summary_dir]
+
+    raw_suffix = "_raw.fastq.gz"
+    raw_R1_suffix = "_R1_raw.fastq.gz"
+    raw_R2_suffix = "_R2_raw.fastq.gz"
+    filtered_suffix = "_trimmed.fastq.gz"
+    filtered_R1_suffix = "_R1_trimmed.fastq.gz"
+    filtered_R2_suffix = "_R2_trimmed.fastq.gz"
+
+    bismark_alignment_files_expected_suffixes = [".nucleotide_stats.txt", "_qualimap.zip", "_sorted.bam"]
+
+    bismark_meth_call_files_expected_suffixes = [".bedGraph.gz", ".bismark.cov.gz", "report.txt.gz", ".M-bias.txt"]
+    bismark_meth_call_files_expected_prefixes = ["CHG", "CHH", "CpG"]
+
+    bismark_summary_expected_files = ["bismark_summary_report.html", "bismark_summary_report.txt"]
+    bismark_individual_summaries_dir = bismark_summary_dir + "/Individual_Sample_Reports/"
+
+    ref_files_expected_suffixes = [".bed", "-map.tsv", ".gtf", ".fa"]
+
+    methylkit_expected_files = ["base-level-percent-methylated.tsv", "tile-level-percent-methylated.tsv"]
+    methylkit_subdir_expected_suffixes = ["hypermethylated-bases.tsv", "hypermethylated-tiles.tsv",
+                                          "hypomethylated-bases.tsv", "hypomethylated-tiles.tsv",
+                                          "diff-methylated-bases.tsv", "diff-methylated-tiles.tsv"]
+
+
+    validation_log = str(args.GLDS_ID) + "_" + output_prefix + "methylseq-validation.log"
+
 
 
 if __name__ == "__main__":
