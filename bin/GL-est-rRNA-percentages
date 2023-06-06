@@ -397,7 +397,7 @@ if config["single_ended"] != True:
 
         shell:
             """
-            hts_SeqScreener -1 {input.R1} -2 {input.R1} -C -r -L {output.json_log} \
+            hts_SeqScreener -1 {input.R1} -2 {input.R2} -C -r -L {output.json_log} \
                 | hts_SeqScreener -s {primary_target_ref_path} -C -r -A {output.json_log} \
                 | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -C -r -A {output.json_log} \
                 | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -C -r -A {output.json_log} \
