@@ -42,6 +42,10 @@ parser.add_argument("-j", "--jobs", help = "Number of jobs to run in parallel (d
 
 parser.add_argument("-i", "--input-reads-dir", help = "Directory holding input reads (default: current working directory)", action = "store", default = "", type = str)
 
+parser.add_argument("--reads-to-scan", help = "In the case with some datasets, e.g. spatial transcriptomics, one set of the paired-reads may be a barcode.\
+                                              Use this argument to specify which we should actually scan. E.g., by adding '--reads-to-scan R2' to specify R2", default = "", action = "store",
+                                       choices = ["R1", "R2"])
+
 parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
 
 parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
@@ -285,6 +289,14 @@ def build_snakemake_call():
     GLDS_ID = args.GLDS_ID
     single_ended = args.single_ended
 
+    if args.reads_to_scan == "R1":
+        expected_suffix = "_R1_raw.fastq.gz"
+    elif args.reads_to_scan == "R2":
+        expected_suffix = "_R2_raw.fastq.gz"
+    else:
+        expected_suffix = ""
+
+
     snakemake_call = ["snakemake",
                       f"--config",
                       f"sample_IDs_file={sample_IDs_file}",
@@ -294,6 +306,7 @@ def build_snakemake_call():
                       f"ref_dir='{ref_dir}'",
                       f"GLDS_ID={GLDS_ID}",
                       f"single_ended={single_ended}",
+                      f"expected_suffix={expected_suffix}",
                       f"logs_dir=hts_SeqScreener_logs"]
 
 
@@ -387,24 +400,46 @@ rule all:
 
 if config["single_ended"] != True:
 
-    rule hts_Seq_Screen:
-        input:
-            R1 = config["input_reads_dir"] + "{ID}_R1_raw.fastq.gz",
-            R2 = config["input_reads_dir"] + "{ID}_R2_raw.fastq.gz"
+    if not config["expected_suffix"]:
 
-        output:
-            json_log = logs_dir + "/{ID}-rRNA-screen.log"
+        rule hts_Seq_Screen:
+            input:
+                R1 = config["input_reads_dir"] + "{ID}_R1_raw.fastq.gz",
+                R2 = config["input_reads_dir"] + "{ID}_R2_raw.fastq.gz"
 
-        shell:
-            """
-            hts_SeqScreener -1 {input.R1} -2 {input.R2} -C -r -L {output.json_log} \
-                | hts_SeqScreener -s {primary_target_ref_path} -C -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -C -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -C -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -C -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -C -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -C -r -A {output.json_log} > /dev/null
-            """
+            output:
+                json_log = logs_dir + "/{ID}-rRNA-screen.log"
+
+            shell:
+                """
+                hts_SeqScreener -1 {input.R1} -2 {input.R2} -C -r -L {output.json_log} \
+                    | hts_SeqScreener -s {primary_target_ref_path} -C -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -C -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -C -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -C -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -C -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -C -r -A {output.json_log} > /dev/null
+                """
+
+    else:
+
+        rule hts_Seq_Screen:
+            input:
+                reads = config["input_reads_dir"] + "{ID}" + config["expected_suffix"]
+
+            output:
+                json_log = logs_dir + "/{ID}-rRNA-screen.log"
+
+            shell:
+                """
+                hts_SeqScreener -U {input.reads} -r -L {output.json_log} \
+                    | hts_SeqScreener -s {primary_target_ref_path} -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -r -A {output.json_log} > /dev/null
+                """
 
 else:
 
@@ -483,7 +518,7 @@ def make_tables(list_of_files):
                 target_ref = "phiX"
 
             # getting hits
-            if config["single_ended"] == True:
+            if config["single_ended"] == True or config["expected_suffix"]:
 
                 num_hits = element["Single_end"]["hits"]
 
