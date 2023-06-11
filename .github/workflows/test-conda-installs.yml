@@ -15,7 +15,7 @@ jobs:
         with:
           miniconda-version: "latest"
           python-version: '3.10'
-          mamba-version: "latest"
+          mamba-version: "*"
           channels: conda-forge,bioconda,defaults,astrobiomike
           channel-priority: true
           activate-environment: genelab-utils
