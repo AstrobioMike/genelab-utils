@@ -40,15 +40,15 @@ if len(sys.argv)==1:
 args = parser.parse_args()
 
 # currently hard-coded things we may want to adjust
-R1_designations = ["_R1_", "_R1."]
-R2_designations = ["_R2_", "_R2."]
+R1_designations = ["_R1_", "_R1.", "-R1.", "-R1-"]
+R2_designations = ["_R2_", "_R2.", "-R2.", "-R2-"]
 extensions = [".fq", ".fastq"]
 standard_GL_R1_suffix = "_R1_raw.fastq.gz"
 standard_GL_R2_suffix = "_R2_raw.fastq.gz"
 standard_GL_SE_suffix = "_raw.fastq.gz"
 
 # additional ones for ATACseq
-R3_designations = ["_R3_", "_R3."]
+R3_designations = ["_R3_", "_R3.", "-R3.", "-R3-"]
 standard_GL_R3_suffix = "_R3_raw.fastq.gz"
 
 md5_output_file = "raw_md5sum.txt"
@@ -65,6 +65,8 @@ versions_used_file = str(args.GLDS_ID) + "-raw-validation-tool-versions.txt"
 log_out = str(args.GLDS_ID) + "-raw-fastqc-multiqc-log.txt"
 
 output_table_filename = str(args.GLDS_ID) + "-raw-validation-summary.tsv"
+
+gzip_or_fastq_format_check_failed_message = "Failed gzip test and/or fastq-format test."
 
 if args.slurm:
 
@@ -112,6 +114,12 @@ def main():
         # checking gzip integrity
         map_dict, out_tab, problem_files_list = check_gzip_integrity(map_dict, out_tab)
 
+        # check fastq format with fastq_utils
+        map_dict, out_tab, problem_files_list = check_fastq_format(map_dict, out_tab, problem_files_list)
+
+        # stop to ensure we don't move on if no files remain after gzip and fastq-format checks
+        check_any_read_files_remain(map_dict, out_tab, problem_files_list)
+
         # generating md5s if none were provided
         if args.md5_file == "":
 
@@ -144,6 +152,9 @@ def main():
         gen_and_add_multiqc_zip_md5()
         # # making md5 for zipped qc dir and html and adding to md5s file
         # gen_and_add_multiqc_md5s()
+
+        # writing out versions used and protocol text for Curation
+        write_versions_used_file()
 
         # finish message
         finish_message(problem_files_list)
@@ -672,6 +683,132 @@ def check_gzip_integrity(map_dict, out_tab):
 
     return(map_dict, out_tab, problem_files_list)
 
+def run_fastq_check(first_file, second_file = "", problem_files_list = []):
+
+    """
+    this runs the fastq_info subprocess and returns needed outputs, used in check_fastq_format function
+    """
+
+    if second_file == "":
+        
+        check_out = subprocess.run(['fastq_info', first_file], capture_output = True, text = True)
+
+    else:
+
+        check_out = subprocess.run(['fastq_info', first_file, second_file], capture_output = True, text = True)
+
+    if check_out.returncode != 0:
+
+        # adding to problem files list if not already present and if there was only one file provided here
+        if second_file == "" and first_file not in problem_files_list:
+            problem_files_list.append(first_file)
+
+        # getting error line to put in output table (it stops after a single error, so will always only report one)
+        for line in iter(check_out.stderr.splitlines()):
+
+            if line.startswith("ERROR"):
+
+                error = re.sub(r".*line", "line", line)
+
+        # catch in case one fails, but does not have an "ERROR" line like searched above
+        if 'error' not in locals():
+
+            error = "Fastq check had non-zero exit, but no error reported. Needs a closer look."
+
+        # making report column hold the error message too
+        check_result = f"FAIL - {error}"
+
+    else:
+
+        check_result = "PASS"
+
+    return(check_result, problem_files_list)
+
+
+def check_fastq_format(map_dict, out_tab, problem_files_list):
+
+    """ 
+    checks fastq format with fastq_utils 
+        - if paired, it checks them individually, and then together (to give a little more info in some cases then if just done on one)
+        - if ATACseq, does all 3, then the paired are R1 and R3    
+    """
+
+    print_notification("Checking fastq format...")
+    # making dictionary holding fastq format validation results
+    fastq_validation_dict = {}
+
+    # case for typical paired-end
+    if not args.single_ended and not args.ATACseq:
+
+        for key in map_dict.keys():
+
+            forward_read_file = map_dict[key][0]
+            reverse_read_file = map_dict[key][1]
+
+            # forward check
+            fwd_fastq_check_result, problem_files_list = run_fastq_check(forward_read_file, problem_files_list = problem_files_list)
+
+            # reverse check
+            rev_fastq_check_result, problem_files_list = run_fastq_check(reverse_read_file, problem_files_list = problem_files_list)
+
+            # paired check
+            paired_fastq_check_result, problem_files_list = run_fastq_check(forward_read_file, reverse_read_file, problem_files_list = problem_files_list)
+            
+            # adding result to dictionary
+            fastq_validation_dict[key] = [fwd_fastq_check_result, rev_fastq_check_result, paired_fastq_check_result]
+
+        ## adding results to output summary table
+        new_tab = pd.DataFrame.from_dict(fastq_validation_dict, orient = "index", columns = ["R1_fastq_format_check", "R2_fastq_format_check", "paired_fastq_format_check"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+    # case if ATACseq
+    elif args.ATACseq:
+
+        for key in map_dict.keys():
+
+            R1_read_file = map_dict[key][0]
+            R2_read_file = map_dict[key][1]
+            R3_read_file = map_dict[key][2]
+
+            # R1 check
+            R1_fastq_check_result, problem_files_list = run_fastq_check(R1_read_file, problem_files_list = problem_files_list)
+
+            # R2 check
+            R2_fastq_check_result, problem_files_list = run_fastq_check(R2_read_file, problem_files_list = problem_files_list)
+
+            # R3 check
+            R3_fastq_check_result, problem_files_list = run_fastq_check(R3_read_file, problem_files_list = problem_files_list)
+
+            # paired R1-R3 check (because ATACseq)
+            paired_R1_R3_fastq_check_result, problem_files_list = run_fastq_check(R1_read_file, R3_read_file, problem_files_list = problem_files_list)
+
+            # adding result to dictionary
+            fastq_validation_dict[key] = [R1_fastq_check_result, R2_fastq_check_result, R3_fastq_check_result, paired_R1_R3_fastq_check_result]
+
+        ## adding results to output summary table
+        new_tab = pd.DataFrame.from_dict(fastq_validation_dict, orient = "index", columns = ["R1_fastq_format_check", "R2_fastq_format_check", "R3_fastq_format_check", "paired_R1_R3_fastq_format_check"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+
+    # case if single-end
+    elif args.single_ended:
+
+        for key in map_dict.keys():
+
+            read_file = map_dict[key][0]
+
+            # running check
+            fastq_check_result, problem_files_list = run_fastq_check(read_file, problem_files_list = problem_files_list)
+            
+            # adding result to dictionary
+            fastq_validation_dict[key] = [fastq_check_result]
+
+        ## adding results to output summary table
+        new_tab = pd.DataFrame.from_dict(fastq_validation_dict, orient = "index", columns = ["fastq_format_check"])
+        out_tab = pd.concat([out_tab, new_tab], axis = 1)
+
+    return(map_dict, out_tab, problem_files_list)
+
 
 def check_md5s(map_dict, out_tab):
     """ checks (if provided) or generates md5sums for all read files """
@@ -828,7 +965,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
                 md5_dict[key] = [forward_md5_out]
 
             else:
-                md5_dict[key] = ["failed-gzip-test"]
+                md5_dict[key] = ["Failed gzip and/or fastq-format check."]
 
 
             if reverse_read_file not in problem_files_list:
@@ -839,7 +976,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
 
             else:
 
-                md5_dict[key].append("failed-gzip-test")
+                md5_dict[key].append("Failed gzip and/or fastq-format check.")
 
 
         # adding md5 values to output table
@@ -884,7 +1021,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
                 md5_dict[key] = [R1_md5_out]
 
             else:
-                md5_dict[key] = ["failed-gzip-test"]
+                md5_dict[key] = ["Failed gzip and/or fastq-format check."]
 
 
             if R2_read_file not in problem_files_list:
@@ -895,7 +1032,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
 
             else:
 
-                md5_dict[key].append("failed-gzip-test")
+                md5_dict[key].append("Failed gzip and/or fastq-format check.")
 
 
             if R3_read_file not in problem_files_list:
@@ -906,7 +1043,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
 
             else:
 
-                md5_dict[key].append("failed-gzip-test")
+                md5_dict[key].append("Failed gzip and/or fastq-format check.")
 
 
         # adding md5 values to output table
@@ -956,7 +1093,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
 
             else:
 
-                md5_dict[key] = ["failed-gzip-test"]                
+                md5_dict[key] = ["Failed gzip and/or fastq-format check."]                
 
         # adding md5 values to output table
         new_tab = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["read_file_md5"])
@@ -1051,6 +1188,63 @@ def write_new_md5s_file(map_dict, md5_df, problem_files_list, files_renamed):
                     md5_out_file.write(str(file_md5) + "  " + str(read_file) + "\n")
 
 
+def check_any_read_files_remain(map_dict, out_tab, problem_files_list):
+
+    """
+    checks if any files remain after gzip and fastq-format tests,
+    if not, writes output summary table with info we have so far and reports message to user
+    """
+
+    list_of_remaining_files = []
+
+    for key in map_dict.keys():
+
+        # only adding if passed the gzip test and fastq-format check (and therefore filename isn't in the problem_files_list)
+        for file in map_dict[key]:
+            if file not in problem_files_list:
+                list_of_remaining_files += [file]
+
+    if len(list_of_remaining_files) == 0:
+
+        print_notification(f"NOTICE: All input files failed the gzip test and/or fastq-format check.", "red")
+
+        print("    You can find what was the cause for each in the generated summary table.\n\n")
+
+        # writing output summary table
+        out_tab.reset_index(inplace = True)
+        out_tab = out_tab.rename(columns = {'index': 'unique_ID'})
+        out_tab.to_csv(output_table_filename, sep = "\t", index = False)
+
+        exit()
+
+
+def write_versions_used_file():
+    
+    """ writes the versions used and protocol text for Curation """
+
+    # getting fastqc version
+    fastqc_version = subprocess.run(['fastqc', '--version'], stdout = subprocess.PIPE).stdout.decode('utf-8')
+    # getting multiqc version
+    multiqc_version = subprocess.run(['multiqc', '--version'], stdout = subprocess.PIPE).stdout.decode('utf-8').replace(", version ", " v")
+    # not as easy to get the fastq_utils version...
+    fastq_info_out = subprocess.run(['fastq_info', '-h'], capture_output = True, text = True)
+    for line in iter(fastq_info_out.stderr.splitlines()):
+
+        if line.startswith("fastq_utils"):
+
+            fastq_utils_version = line
+
+    # writing out versions used to file
+    with open(versions_used_file, "w") as out_file:
+
+        out_file.write(str(fastq_utils_version) + str(fastqc_version) + str(multiqc_version))
+
+        out_file.write("\nProtocol text:\n\n")
+        out_file.write("Fastq format was checked with fastq_utils v" + str(fastq_utils_version).replace("fastq_utils ", "").replace("\n", "") + ". " + \
+                       "Quality assessment of reads was performed with FastQC " + str(fastqc_version).replace("FastQC ", "").replace("\n", "") + \
+                       " and reports were combined with MultiQC " + str(multiqc_version).replace("multiqc ", "").replace("\n", "") + ".\n\n")
+
+
 def run_fastqc_and_multiqc(map_dict, problem_files_list):
     """ runs fastqc on all read files and writes out versions to file """
 
@@ -1061,14 +1255,13 @@ def run_fastqc_and_multiqc(map_dict, problem_files_list):
 
     for key in map_dict.keys():
 
-        # only adding if passed the gzip test (and therefore filename isn't in the problem_files_list)
+        # only adding if passed the gzip test and fastq-format check (and therefore filename isn't in the problem_files_list)
         for file in map_dict[key]:
             if file not in problem_files_list:
                 list_of_all_files += [file]
 
     # converting list to space-delimited string for passing to subprocess
     list_for_subprocess = " ".join(list_of_all_files)
-
 
     # getting fastqc version
     fastqc_version = subprocess.run(['fastqc', '--version'], stdout = subprocess.PIPE).stdout.decode('utf-8')
@@ -1100,15 +1293,6 @@ def run_fastqc_and_multiqc(map_dict, problem_files_list):
 
             if file != log_out:
                 os.remove(file)
-
-    # writing out versions used to file
-    with open(versions_used_file, "w") as out_file:
-
-        out_file.write(str(fastqc_version) + str(multiqc_version))
-
-        out_file.write("\nProtocol text:\n\n")
-        out_file.write("Quality assessment of reads was performed with FastQC " + str(fastqc_version).replace("FastQC ", "").replace("\n", "") + \
-                       " and reports were combined with MultiQC " + str(multiqc_version).replace("multiqc ", "").replace("\n", "") + ".\n\n")
 
 
 def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list):
@@ -1147,13 +1331,13 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
             else: 
 
-                num_forward_reads = "fwd-failed-gzip-test"
-                counts_dict[key] = ["failed-gzip-test"]
-                length_range_dict[key] = ["failed-gzip-test"]
-                avg_length_dict[key] = ["failed-gzip-test"]
+                num_forward_reads = gzip_or_fastq_format_check_failed_message
+                counts_dict[key] = [gzip_or_fastq_format_check_failed_message]
+                length_range_dict[key] = [gzip_or_fastq_format_check_failed_message]
+                avg_length_dict[key] = [gzip_or_fastq_format_check_failed_message]
 
-                forward_avg_read_length = "fwd-failed-gzip-test"
-                forward_read_length_range = "fwd-failed-gzip-test"
+                forward_avg_read_length = gzip_or_fastq_format_check_failed_message
+                forward_read_length_range = gzip_or_fastq_format_check_failed_message
 
                 fastqc_files_count[key] = 0
 
@@ -1175,13 +1359,13 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
             else:
 
-                num_reverse_reads = "rev-failed-gzip-test"
-                counts_dict[key].append("failed-gzip-test")
-                length_range_dict[key].append("failed-gzip-test")
-                avg_length_dict[key].append("failed-gzip-test")
+                num_reverse_reads = gzip_or_fastq_format_check_failed_message
+                counts_dict[key].append(gzip_or_fastq_format_check_failed_message)
+                length_range_dict[key].append(gzip_or_fastq_format_check_failed_message)
+                avg_length_dict[key].append(gzip_or_fastq_format_check_failed_message)
 
-                reverse_avg_read_length = "rev-failed-gzip-test"
-                reverse_read_length_range = "rev-failed-gzip-test"
+                reverse_avg_read_length = gzip_or_fastq_format_check_failed_message
+                reverse_read_length_range = gzip_or_fastq_format_check_failed_message
 
                 fastqc_files_count[key] += 0
 
@@ -1242,13 +1426,13 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
             else: 
 
-                num_R1_reads = "R1-failed-gzip-test"
-                counts_dict[key] = ["failed-gzip-test"]
-                length_range_dict[key] = ["failed-gzip-test"]
-                avg_length_dict[key] = ["failed-gzip-test"]
+                num_R1_reads = gzip_or_fastq_format_check_failed_message
+                counts_dict[key] = [gzip_or_fastq_format_check_failed_message]
+                length_range_dict[key] = [gzip_or_fastq_format_check_failed_message]
+                avg_length_dict[key] = [gzip_or_fastq_format_check_failed_message]
 
-                R1_avg_read_length = "R1-failed-gzip-test"
-                R1_read_length_range = "R1-failed-gzip-test"
+                R1_avg_read_length = gzip_or_fastq_format_check_failed_message
+                R1_read_length_range = gzip_or_fastq_format_check_failed_message
 
                 fastqc_files_count[key] = 0
 
@@ -1270,13 +1454,13 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
             else:
 
-                num_R2_reads = "R2-failed-gzip-test"
-                counts_dict[key].append("failed-gzip-test")
-                length_range_dict[key].append("failed-gzip-test")
-                avg_length_dict[key].append("failed-gzip-test")
+                num_R2_reads = gzip_or_fastq_format_check_failed_message
+                counts_dict[key].append(gzip_or_fastq_format_check_failed_message)
+                length_range_dict[key].append(gzip_or_fastq_format_check_failed_message)
+                avg_length_dict[key].append(gzip_or_fastq_format_check_failed_message)
 
-                R2_avg_read_length = "R2-failed-gzip-test"
-                R2_read_length_range = "R2-failed-gzip-test"
+                R2_avg_read_length = gzip_or_fastq_format_check_failed_message
+                R2_read_length_range = gzip_or_fastq_format_check_failed_message
 
                 fastqc_files_count[key] += 0
 
@@ -1297,13 +1481,13 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
             else:
 
-                num_R3_reads = "R3-failed-gzip-test"
-                counts_dict[key].append("failed-gzip-test")
-                length_range_dict[key].append("failed-gzip-test")
-                avg_length_dict[key].append("failed-gzip-test")
+                num_R3_reads = gzip_or_fastq_format_check_failed_message
+                counts_dict[key].append(gzip_or_fastq_format_check_failed_message)
+                length_range_dict[key].append(gzip_or_fastq_format_check_failed_message)
+                avg_length_dict[key].append(gzip_or_fastq_format_check_failed_message)
 
-                R3_avg_read_length = "R3-failed-gzip-test"
-                R3_read_length_range = "R3-failed-gzip-test"
+                R3_avg_read_length = gzip_or_fastq_format_check_failed_message
+                R3_read_length_range = gzip_or_fastq_format_check_failed_message
 
                 fastqc_files_count[key] += 0
 
@@ -1366,9 +1550,9 @@ def parse_and_add_read_counts_and_lengths(map_dict, out_tab, problem_files_list)
 
             else:
 
-                counts_dict[key] = ["failed-gzip-test"]
-                length_range_dict[key] = ["failed-gzip-test"]
-                avg_length_dict[key] = ["failed-gzip-test"]
+                counts_dict[key] = [gzip_or_fastq_format_check_failed_message]
+                length_range_dict[key] = [gzip_or_fastq_format_check_failed_message]
+                avg_length_dict[key] = [gzip_or_fastq_format_check_failed_message]
 
                 fastqc_files_count[key] = 0
 
@@ -1453,7 +1637,7 @@ def finish_message(problem_files_list):
 
     if len(problem_files_list) > 0:
 
-        print_notification("NOTICE: " + str(len(problem_files_list)) + " file(s) did not pass the gzip integrity test (i.e., they are corrupted).", "red")
+        print_notification("NOTICE: " + str(len(problem_files_list)) + " file(s) did not pass the gzip integrity test and/or the fastq-format check.", "red")
 
         print("    These are therefore currently missing from the multiqc output as well as the")
         print("    'raw_md5sum.txt'. You can find which these are in the generated summary table.\n\n")
