@@ -66,7 +66,7 @@ log_out = str(args.GLDS_ID) + "-raw-fastqc-multiqc-log.txt"
 
 output_table_filename = str(args.GLDS_ID) + "-raw-validation-summary.tsv"
 
-gzip_or_fastq_format_check_failed_message = "Failed gzip test and/or fastq-format test."
+gzip_or_fastq_format_check_failed_message = "Failed gzip test and/or fastq-format check."
 
 if args.slurm:
 
@@ -965,7 +965,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
                 md5_dict[key] = [forward_md5_out]
 
             else:
-                md5_dict[key] = ["Failed gzip and/or fastq-format check."]
+                md5_dict[key] = [gzip_or_fastq_format_check_failed_message]
 
 
             if reverse_read_file not in problem_files_list:
@@ -976,7 +976,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
 
             else:
 
-                md5_dict[key].append("Failed gzip and/or fastq-format check.")
+                md5_dict[key].append(gzip_or_fastq_format_check_failed_message)
 
 
         # adding md5 values to output table
@@ -1021,7 +1021,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
                 md5_dict[key] = [R1_md5_out]
 
             else:
-                md5_dict[key] = ["Failed gzip and/or fastq-format check."]
+                md5_dict[key] = [gzip_or_fastq_format_check_failed_message]
 
 
             if R2_read_file not in problem_files_list:
@@ -1032,7 +1032,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
 
             else:
 
-                md5_dict[key].append("Failed gzip and/or fastq-format check.")
+                md5_dict[key].append(gzip_or_fastq_format_check_failed_message)
 
 
             if R3_read_file not in problem_files_list:
@@ -1043,7 +1043,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
 
             else:
 
-                md5_dict[key].append("Failed gzip and/or fastq-format check.")
+                md5_dict[key].append(gzip_or_fastq_format_check_failed_message)
 
 
         # adding md5 values to output table
@@ -1093,7 +1093,7 @@ def gen_md5s(map_dict, out_tab, problem_files_list):
 
             else:
 
-                md5_dict[key] = ["Failed gzip and/or fastq-format check."]                
+                md5_dict[key] = [gzip_or_fastq_format_check_failed_message]                
 
         # adding md5 values to output table
         new_tab = pd.DataFrame.from_dict(md5_dict, orient = "index", columns = ["read_file_md5"])
