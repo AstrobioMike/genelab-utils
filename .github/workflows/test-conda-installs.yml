@@ -1,0 +1,27 @@
+name: testing conda installs
+
+on: [push]
+
+jobs:
+  install-tests:
+    name: ${{ matrix.os }} conda install test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest"]
+
+    steps:
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniconda-version: "latest"
+          python-version: '3.10'
+          mamba-version: "latest"
+          channels: conda-forge,bioconda,defaults,astrobiomike
+          channel-priority: true
+          activate-enviroment: genelab-utils
+      - shell: bash -el {0}
+        run: |
+          mamba install -y genelab-utils
+      - shell: bash -l {0}
+        run: |
+          GL-version
