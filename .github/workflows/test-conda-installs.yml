@@ -18,7 +18,7 @@ jobs:
           mamba-version: "latest"
           channels: conda-forge,bioconda,defaults,astrobiomike
           channel-priority: true
-          activate-enviroment: genelab-utils
+          activate-environment: genelab-utils
       - shell: bash -el {0}
         run: |
           mamba install -y genelab-utils
