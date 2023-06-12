@@ -100,7 +100,7 @@ def main():
         append_message_to_log(f"    - populated {args.output_prefix + bismark_index_zip} detected")
 
         # checking for all expected files in bismark meth calls directory
-        check_dir_for_file_patterns(bismark_meth_calls_dir, bismark_meth_call_files_expected_suffixes, sample_names = sample_names, expected_prefixes = bismark_meth_call_files_expected_prefixes)
+        check_methylation_call_zips_for_file_patterns(bismark_meth_calls_dir, bismark_meth_call_files_expected_suffixes, sample_names = sample_names, expected_prefixes = bismark_meth_call_files_expected_prefixes)
         append_message_to_log(f"    - all expected files found in the {bismark_meth_calls_dir} directory")
 
         # checking for all expected files in bismark summary dir
@@ -108,13 +108,14 @@ def main():
         check_dir_for_file_patterns(bismark_individual_summaries_dir, [".html"], sample_names = sample_names)
         append_message_to_log(f"    - all expected files found in the {bismark_summary_dir} directory")
 
-        # checking for all expected outputs in methylkit dir
+        # checking for all expected base outputs in methylkit dir
         check_dir_for_files(methylkit_expected_files, methylkit_dir)
-        append_message_to_log(f"    - all expected files found in the {methylkit_dir} directory")
+        append_message_to_log(f"    - all expected base files found in the {methylkit_dir} directory", one_return = True)
         
+        # checking for expected outputs in all contrasts in methylkit dir
         global num_contrasts
-        num_contrasts = check_methylkit_subdirectories()
-        append_message_to_log(f"        - all expected files found for the {num_contrasts} detected contrast(s) within the {methylkit_dir} directory")
+        num_contrasts = check_methylkit_contrast_zips()
+        append_message_to_log(f"        - and all expected files found for the {num_contrasts} detected contrast(s) in zips within this directory")
         
         # checking for all expected files in the reference genome dir
         check_dir_for_file_patterns(ref_files_dir, ref_files_expected_suffixes)
@@ -172,10 +173,14 @@ def setup_log():
         log.write(f"Performing baseline {args.assay} V+V as per: {V_V_guidelines_link}\n\n")
 
 
-def append_message_to_log(message):
+def append_message_to_log(message, one_return = False):
 
     with open(validation_log, "a") as log:
-        log.write(f"{message}\n\n")
+
+        if one_return:
+            log.write(f"{message}\n")
+        else:
+            log.write(f"{message}\n\n")
 
 
 def add_to_log_table(col1, col2):
@@ -696,6 +701,50 @@ def check_metagenomics_processing_zip(samples):
                 report_failure("The '" + str(processing_zip_file) + "' does not have the '" + str(target_log) + "' log file as expected.")
 
 
+def check_methylation_call_zips_for_file_patterns(directory, expected_suffixes, sample_names, expected_prefixes):
+
+    """ 
+    checks that files are found in the methylation calls zips for each sample
+    """
+
+    # getting all files in target_dir
+    all_files = get_files_in_dir(directory)
+
+    # keeping only zips
+    all_zips = [x for x in all_files if x.endswith(".zip")]
+
+    # checking those with expected suffixes
+    for sample_ID in sample_names:
+
+        curr_zip_file = os.path.join(bismark_meth_calls_dir, sample_ID + bismark_meth_calls_zip_suffix)
+        
+        # making sure it exists and isn't empty
+        check_for_file_and_contents(curr_zip_file)
+
+        # getting files in zip
+        with zipfile.ZipFile(curr_zip_file) as zip_obj:
+
+            entries = zip_obj.namelist()
+
+        # checking those with expected suffixes
+        for suffix in expected_suffixes:
+            
+            hit = [ file for file in entries if file.endswith(suffix) ]
+
+            if not hit:
+                report_failure(f"An expected file ending with '*{suffix}' was not found in the {curr_zip_file} archive.")
+        
+        
+        for prefix in expected_prefixes:
+
+            curr_prefix = prefix + "_context_" + sample_ID + "_bismark"
+
+            hit = [ file for file in entries if file.startswith(curr_prefix) ]
+
+            if not hit:
+                report_failure(f"An expected file beginning with '{prefix}*' was not found in the {curr_zip_file} archive.")
+
+
 def check_dir_for_file_patterns(directory, expected_suffixes, sample_names = False, expected_prefixes = False):
 
     """ this is exclusive to MethylSeq """
@@ -756,19 +805,48 @@ def check_dir_for_files(expected_files, directory):
             report_failure(f"The expected file '{file}' was not found in the {directory} directory.")
 
 
-def check_methylkit_subdirectories():
+# def check_methylkit_subdirectories():
+
+#     """ 
+#     for every contrast subdirectory that exists, this checks the expected files are present
+#     """
+
+#     present_dirs = get_directories_in_dir(methylkit_dir)
+
+#     num_contrasts = len(present_dirs)
+
+#     for curr_directory in present_dirs:
+
+#         check_dir_for_file_patterns(os.path.join(methylkit_dir, curr_directory), methylkit_subdir_expected_suffixes)
+
+#     return(num_contrasts)
+
+def check_methylkit_contrast_zips():
 
     """ 
-    for every contrast subdirectory that exists, this checks the expected files are present
+    for every contrast zip that exists, this checks the expected files are present
     """
 
-    present_dirs = get_directories_in_dir(methylkit_dir)
+    present_zips = [file for file in get_files_in_dir(methylkit_dir) if file.endswith(".zip")]
 
-    num_contrasts = len(present_dirs)
+    num_contrasts = len(present_zips)
 
-    for curr_directory in present_dirs:
+    for zip_file in present_zips:
 
-        check_dir_for_file_patterns(os.path.join(methylkit_dir, curr_directory), methylkit_subdir_expected_suffixes)
+        curr_zip_file = os.path.join(methylkit_dir, zip_file)
+
+        # getting files in zip
+        with zipfile.ZipFile(curr_zip_file) as zip_obj:
+
+            entries = zip_obj.namelist()
+
+        # checking those with expected suffixes
+        for suffix in methylkit_subdir_expected_suffixes:
+            
+            hit = [ file for file in entries if file.endswith(suffix) ]
+
+            if not hit:
+                report_failure(f"An expected file ending with '*{suffix}' was not found in the {curr_zip_file} archive.")
 
     return(num_contrasts)
 
@@ -829,8 +907,20 @@ def get_read_count_stats():
 
     filtered_min, filtered_max, filtered_mean, filtered_median = gen_stats(filtered_counts)
 
-    with open(validation_log, "a") as log:
+    print("\n  Raw read count summary:")
+    print("    {:<10} {:>0}".format("Min:", raw_min))
+    print("    {:<10} {:>0}".format("Max:", raw_max))
+    print("    {:<10} {:>0}".format("Mean:", raw_mean))
+    print("    {:<10} {:>0}".format("Median:", raw_median))
 
+    print("\n  Filtered read count summary:")
+    print("    {:<10} {:>0}".format("Min:", filtered_min))
+    print("    {:<10} {:>0}".format("Max:", filtered_max))
+    print("    {:<10} {:>0}".format("Mean:", filtered_mean))
+    print("    {:<10} {:>0}".format("Median:", filtered_median))
+    print("")
+
+    with open(validation_log, "a") as log:
 
         log.write("\n  Raw read count summary:")
         log.write("\n    {:<10} {:>0}".format("Min:", raw_min))
@@ -969,9 +1059,9 @@ elif args.assay == "MethylSeq":
 
     ref_files_dir = "Reference_Genome_Files/"
     bismark_alignments_dir = "Bismark_Alignments/"
-    bismark_meth_calls_dir = "Bismark_Methylation_Calls/"
+    bismark_meth_calls_dir = "Methylation_Call_Data/"
     bismark_summary_dir = "Bismark_Summary/"
-    methylkit_dir = "MethylKit_Outputs/"
+    methylkit_dir = "Differential_Methylation_Analysis_Data/"
 
     bismark_index_zip = "Bismark_Index.zip"
 
@@ -987,7 +1077,8 @@ elif args.assay == "MethylSeq":
 
     bismark_alignment_files_expected_suffixes = [".nucleotide_stats.txt", "_qualimap.zip", "_sorted.bam"]
 
-    bismark_meth_call_files_expected_suffixes = [".bedGraph.gz", ".bismark.cov.gz", "report.txt.gz", ".M-bias.txt"]
+    bismark_meth_calls_zip_suffix = "_bismark_methylation_calls.zip"
+    bismark_meth_call_files_expected_suffixes = [".bedGraph.gz", ".bismark.cov.gz", "CpG_report.txt.gz", ".M-bias.txt", "_splitting_report.txt", "cytosine_context_summary.txt"]
     bismark_meth_call_files_expected_prefixes = ["CHG", "CHH", "CpG"]
 
     bismark_summary_expected_files = ["bismark_summary_report.html", "bismark_summary_report.txt"]
