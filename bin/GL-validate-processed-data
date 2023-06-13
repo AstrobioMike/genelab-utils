@@ -101,7 +101,7 @@ def main():
 
         # checking for all expected files in bismark meth calls directory
         check_methylation_call_zips_for_file_patterns(bismark_meth_calls_dir, bismark_meth_call_files_expected_suffixes, sample_names = sample_names, expected_prefixes = bismark_meth_call_files_expected_prefixes)
-        append_message_to_log(f"    - all expected files found in the {bismark_meth_calls_dir} directory")
+        append_message_to_log(f"    - all expected files found in the {bismark_meth_calls_dir} directory and its contained zip archives")
 
         # checking for all expected files in bismark summary dir
         check_dir_for_files(bismark_summary_expected_files, bismark_summary_dir)
@@ -115,7 +115,7 @@ def main():
         # checking for expected outputs in all contrasts in methylkit dir
         global num_contrasts
         num_contrasts = check_methylkit_contrast_zips()
-        append_message_to_log(f"        - and all expected files found for the {num_contrasts} detected contrast(s) in zips within this directory")
+        append_message_to_log(f"        - and all expected files found for the {num_contrasts} detected contrast(s) in zip archives within this directory")
         
         # checking for all expected files in the reference genome dir
         check_dir_for_file_patterns(ref_files_dir, ref_files_expected_suffixes)
