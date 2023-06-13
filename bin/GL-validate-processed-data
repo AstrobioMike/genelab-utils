@@ -49,6 +49,8 @@ def main():
     # initializing log file
     setup_log()
 
+    append_message_to_log(f"Summary of checks:")
+
     check_for_file_and_contents(args.output_prefix + "README.txt")
     append_message_to_log(f"    - populated {args.output_prefix + 'README.txt'} detected")
 
@@ -171,6 +173,8 @@ def setup_log():
 
     with open(validation_log, "w") as log:
         log.write(f"Performing baseline {args.assay} V+V as per: {V_V_guidelines_link}\n\n")
+        command_run = " ".join(sys.argv)
+        log.write(f"Validation program executed as:\n    {command_run}\n\n")
 
 
 def append_message_to_log(message, one_return = False):
@@ -1092,7 +1096,7 @@ elif args.assay == "MethylSeq":
                                           "diff-methylated-bases.tsv", "diff-methylated-tiles.tsv"]
 
 
-    validation_log = str(args.GLDS_ID) + "_" + output_prefix + "methylseq-validation.log"
+    validation_log = str(args.GLDS_ID) + "-" + output_prefix + "methylseq-validation.log"
 
 
 
