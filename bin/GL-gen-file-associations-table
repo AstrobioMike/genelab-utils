@@ -13,13 +13,13 @@ import zipfile
 import glob
 
 parser = argparse.ArgumentParser(description = "This program generates the file-assocations table needed by Curation for \
-                                               newly processed datasets, currently designed to work for metagenomics and \
-                                               amplicon datasets. It is intended to be run after `GL-validate-processed-data` \
+                                               newly processed datasets, currently designed to work for metagenomics, \
+                                               amplicon, and methylseq datasets. It is intended to be run after `GL-validate-processed-data` \
                                                has been run successfully.")
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument("-a", "--assay", choices = ['Amplicon', 'Metagenomics'], 
+required.add_argument("-a", "--assay", choices = ['Amplicon', 'Metagenomics', 'MethylSeq'], 
                       help = "Specifies which datatype (assay) this is for", action = "store", required = True)
 
 required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-276")', action = "store", required = True)
@@ -37,8 +37,8 @@ parser.add_argument("--R1-used-as-single-ended-data", help = "Provide this flag 
                     action = "store_true")
 parser.add_argument("--include-raw-multiqc-in-output", help = "Provide this flag if wanting to include the raw multiqc zip in the file-associations output table (may be wanted for older datasets)", 
                     action = "store_true")
-
-                    
+parser.add_argument("--use-sample-names-from-assay-table", help = "Provide this flag if the unique filename strings in the processed outputs are taken directly from the \
+                                                                   'Sample Name' column of the input assay table.", action = "store_true")
 
 
 if len(sys.argv)==1:
@@ -76,6 +76,10 @@ def main():
     elif args.assay == "Metagenomics":
 
         gen_and_write_out_metagenomics_filenames_table(unique_filename_prefixes, map_tab, read_counts_df, sample_file_dict)
+
+    elif args.assay == "MethylSeq":
+
+        gen_and_write_out_methylseq_filenames_table(unique_filename_prefixes, map_tab, read_counts_df, sample_file_dict)
 
 
 ################################################################################
@@ -119,6 +123,10 @@ def preflight_checks():
 
     if args.isa_zip != "" and args.assay_table != "":
         report_failure("This program requires *only* an input ISA object (passed to '-i') or a specific assay table (passed to '-a'), not both.")
+
+    # ensuring --map argument was only provided if assay type is amplicon
+    if args.map and args.assay != "Amplicon":
+        report_failure("The '--map' argument is currently only usable when the assay type is 'Amplicon'.")
 
 
 def check_for_file_and_contents(file_path):
@@ -181,12 +189,19 @@ def parse_amplicon_names(name):
 
 def get_sample_names_and_unique_filenames(assay_table):
     """
-    This gets the sample names (first column) from the assay table,
-    and tries to get what would have been the unique filename prefixes generated from those
-    based on what's in the Raw Data File column of the assay table.
+    This gets the sample names ('Sample Name' column) from the assay table,
+    and tries to get what would have been the unique filename prefixes generated from
+    what's in the Raw Data File column of the assay table.
+
+    Unless the --use-sample-names-from-assay-table flag was provided, then it just uses what's
+    in the 'Sample Name' column.
     """
 
     sample_names = assay_table["Sample Name"].tolist()
+
+    if args.use_sample_names_from_assay_table:
+        unique_filename_prefixes = sample_names
+        return(sample_names, unique_filename_prefixes)
 
     all_filenames = assay_table["Raw Data File"]
 
@@ -291,7 +306,7 @@ def get_read_counts_from_raw_multiqc(sample_names, mapping_tab):
 
             # reading in
             zip_file = zipfile.ZipFile(curr_file_path)
-            curr_df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+            curr_df = pd.read_csv(zip_file.open(raw_multiqc_stats_file_path), sep = "\t", usecols = [0,5])
             curr_df.columns = ["sample", "counts"]
             curr_df.set_index("sample", inplace = True)
 
@@ -305,7 +320,7 @@ def get_read_counts_from_raw_multiqc(sample_names, mapping_tab):
 
     else:
         zip_file = zipfile.ZipFile(fastqc_dir + output_prefix + raw_multiqc_zip)
-        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [0,5])
+        df = pd.read_csv(zip_file.open(raw_multiqc_stats_file_path), sep = "\t", usecols = [0,5])
         df.columns = ["sample", "counts"]
         df.set_index("sample", inplace = True)
 
@@ -606,6 +621,80 @@ def gen_and_write_out_metagenomics_filenames_table(unique_filename_prefixes, map
         building_df.to_csv(str(args.GLDS_ID) + "-associated-file-names.tsv", sep = "\t", index = False)
 
 
+
+
+def gen_and_write_out_methylseq_filenames_table(unique_filename_prefixes, mapping_tab, read_count_tab, sample_file_dict):
+
+    header_colnames = ["Sample Name", "Parameter Value[README]",
+                       "Parameter Value[" + filtered_reads_dir.replace("_", " ").rstrip("/") + "]",
+                       "Parameter Value[" + fastqc_dir.replace("_", " ").rstrip("/") + "]",
+                       "Parameter Value[" + ref_files_dir.replace("_", " ").rstrip("/") + "]",
+                       "Parameter Value[" + bismark_alignments_dir.replace("_", " ").rstrip("/") + "]",
+                       "Parameter Value[" + bismark_meth_calls_dir.replace("_", " ").rstrip("/") + "]",
+                       "Parameter Value[" + bismark_summary_dir.replace("_", " ").rstrip("/") + "]",
+                       "Parameter Value[" + methylkit_dir.replace("_", " ").rstrip("/") + "]",
+                       "Parameter Value[Processing Info]"]
+
+    # entries that don't change per sample
+    readme = file_prefix + output_prefix + "README.txt"
+
+    if args.include_raw_multiqc_in_output:
+
+        fastqc = [file_prefix + output_prefix + raw_multiqc_zip, 
+                  file_prefix + output_prefix + filtered_multiqc_zip]
+
+    else:
+
+        fastqc = [file_prefix + output_prefix + filtered_multiqc_zip]
+
+    ref_files = [file_prefix + file for file in os.listdir(ref_files_dir)]
+
+    # right now does not handle if some samples are not in all contrasts, likely need to address this when cases like that come up
+    methylkit_output_files = [file_prefix + file for file in os.listdir(methylkit_dir)]
+    
+    processing_info = file_prefix + output_prefix + "processing_info.zip"
+
+    building_df = pd.DataFrame(columns = header_colnames)
+
+    for sample in unique_filename_prefixes:
+
+        # filtered reads files
+        curr_filt_data = [file_prefix + file for file in os.listdir(filtered_reads_dir) if file.startswith(sample + "_trimmed")]
+        curr_filt_data.append(read_filter_reports_file)
+
+        # bismark alignment files
+        curr_align_files = [file_prefix + file for file in os.listdir(bismark_alignments_dir) if file.startswith(sample + "_bismark")]
+        curr_align_files.append(align_reports_file)
+
+        # meth calls files
+        curr_meth_call_files = [file_prefix + file for file in os.listdir(bismark_meth_calls_dir) if file.startswith(sample + "_bismark")]
+        curr_meth_call_files.append(meth_call_reports_file)
+
+        # bismark summary files
+        curr_bismark_summary_files = [file_prefix + file for file in os.listdir(individual_summary_reports_dir) if file.startswith(sample + "_bismark")]
+        curr_bismark_summary_files.append(bismark_summary_report_text_file)
+        curr_bismark_summary_files.append(bismark_summary_report_html_file)
+
+        curr_row_as_list = [sample_file_dict[sample],
+                            readme,
+                            ", ".join(curr_filt_data),
+                            ", ".join(fastqc),
+                            ", ".join(ref_files),
+                            ", ".join(curr_align_files),
+                            ", ".join(curr_meth_call_files),
+                            ", ".join(curr_bismark_summary_files),
+                            ", ".join(methylkit_output_files),
+                            processing_info] 
+
+        # adding to building dataframe
+        building_df.loc[len(building_df)] = curr_row_as_list
+
+    if output_prefix != "":
+        building_df.to_csv(str(args.GLDS_ID) + "_" + output_prefix + "associated-file-names.tsv", sep = "\t", index = False)
+    else:
+        building_df.to_csv(str(args.GLDS_ID) + "-associated-file-names.tsv", sep = "\t", index = False)
+
+
 ### variable setup ###
 
 # universal settings
@@ -640,6 +729,8 @@ if args.assay == "Amplicon":
     primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
     primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
 
+    raw_multiqc_stats_file_path = str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"
+
 elif args.assay == "Metagenomics":
 
     file_prefix = args.GLDS_ID + "_GMetagenomics_"
@@ -666,6 +757,33 @@ elif args.assay == "Metagenomics":
     older_raw_R2_suffix = "_R2_raw.fastq.gz"
 
     assembly_suffix = "-assembly.fasta"
+
+    raw_multiqc_stats_file_path = str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"
+
+elif args.assay == "MethylSeq":
+
+    file_prefix = args.GLDS_ID + "_Gwgbs_"
+
+    ref_files_dir = "Reference_Genome_Files/"
+    bismark_alignments_dir = "Bismark_Alignments/"
+    bismark_meth_calls_dir = "Methylation_Call_Data/"
+    bismark_summary_dir = "Bismark_Summary/"
+    individual_summary_reports_dir = os.path.join(bismark_summary_dir, "Individual_Sample_Reports")
+    methylkit_dir = "Differential_Methylation_Analysis_Data/"
+
+
+
+    bismark_index_zip = "Bismark_Index.zip"
+
+    read_filter_reports_file = file_prefix + "trimgalore-reports.txt"
+    align_reports_file = file_prefix + "bismark-align-reports.txt"
+    meth_call_reports_file = file_prefix + "bismark-methylation-call-reports.txt"
+
+    bismark_summary_report_text_file = file_prefix + "bismark_summary_report.txt"
+    bismark_summary_report_html_file = file_prefix + "bismark_summary_report.html"
+
+    raw_multiqc_stats_file_path = str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"
+
 
 if __name__ == "__main__":
     main()
