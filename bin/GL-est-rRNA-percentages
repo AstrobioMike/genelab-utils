@@ -30,6 +30,7 @@ required.add_argument('--ref', help = "The primary target organism/clade",
                                                                     'G-hirsutum',
                                                                     'B-distachyon',
                                                                     'R-norvegicus',
+                                                                    'L-heterotoma',
                                                                     'Escherichia',
                                                                     'Mycobacterium',
                                                                     'Pseudomonas',
@@ -70,13 +71,16 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
                            "Mycobacterium": "rrna-Mycobacterium.fasta",
                            "Mus-musculus": "rrna-Mmusculus.fasta",
                            "R-norvegicus": "rrna-Rnorvegicus.fasta",
-                           "Streptococcus": "rrna-Streptococcus.fasta"}
+                           "Streptococcus": "rrna-Streptococcus.fasta",
+                           "L-heterotoma": "rrna-Lheterotoma.fasta"}
 
-# setting date retrieved (will need to adjust/efficiency-ize this as more are added)
+# setting date retrieved (will eventually need to adjust/efficiency-ize this as more are added)
 if args.ref == "Mycobacterium":
     data_of_rRNA_refs_fetched = "20-Oct-2022"
 elif args.ref == "G-hirsutum":
     data_of_rRNA_refs_fetched = "10-Apr-2023"
+elif args.ref == "L-heterotoma":
+    data_of_rRNA_refs_fetched = "14-Jun-2023"
 else:
     data_of_rRNA_refs_fetched = "01-Sep-2021"
 
