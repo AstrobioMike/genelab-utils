@@ -289,21 +289,24 @@ def check_multiqc_outputs(sample_names):
     # checking raw
     zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + raw_multiqc_zip)
 
-    # methylseq workflow has these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
-    # right now, amplicon and metagenomics have raw_multiqc_report/multiqc_general_stats.txt
-    if args.assay == "MethylSeq":
-        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    # methylseq workflow had these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
+    # amplicon and metagenomics had raw_multiqc_report/multiqc_general_stats.txt
+    # i'm in the process of adjusting amplicon and metagenomics
+    # this is the old code when i needed both
+    # if args.assay == "MethylSeq":
+    #     df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
 
-    else:
-        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    # else:
+    #     df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
 
+    df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
 
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
     if not args.single_ended:
 
-        R1_suffix = raw_R1_suffix.split(".")[0]
-        R2_suffix = raw_R2_suffix.split(".")[0]
+        R1_suffix = raw_R1_suffix.split(".")[0].replace("_raw", "")
+        R2_suffix = raw_R2_suffix.split(".")[0].replace("_raw", "")
 
         for sample in sample_names:
             if not sample + R1_suffix in file_prefixes_in_multiqc:
@@ -322,21 +325,26 @@ def check_multiqc_outputs(sample_names):
     # checking filtered
     zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + filtered_multiqc_zip)
 
-    # methylseq workflow has these nested, e.g., filtered_multiqc_report/filtered_multiqc_data/multiqc_general_stats.txt
-    # right now, amplicon and metagenomics have filtered_multiqc_report/multiqc_general_stats.txt
-    if args.assay == "MethylSeq":
-        df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    # methylseq workflow had these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
+    # amplicon and metagenomics had raw_multiqc_report/multiqc_general_stats.txt
+    # i'm in the process of adjusting amplicon and metagenomics
+    # this is the old code when i needed both
+    # if args.assay == "MethylSeq":
+    #     df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
 
-    else:
+    # else:
 
-        df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    #     df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     
+    df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
     if not args.single_ended:
 
-        R1_suffix = filtered_R1_suffix.split(".")[0]
-        R2_suffix = filtered_R2_suffix.split(".")[0]
+        R1_suffix = filtered_R1_suffix.split(".")[0].replace("_filtered", "")
+        R2_suffix = filtered_R2_suffix.split(".")[0].replace("_filtered", "")
+
         for sample in sample_names:
             if not sample + R1_suffix in file_prefixes_in_multiqc:
                 report_failure("The filtered multiqc output is missing the expected '" + sample + R1_suffix + "' entry.")
@@ -875,13 +883,17 @@ def get_read_count_stats():
     # for raw
     zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + raw_multiqc_zip)
 
-    # methylseq workflow has these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
-    # right now, amplicon and metagenomics have raw_multiqc_report/multiqc_general_stats.txt
-    if args.assay == "MethylSeq":
-        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+    # methylseq workflow had these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
+    # amplicon and metagenomics had raw_multiqc_report/multiqc_general_stats.txt
+    # i'm in the process of adjusting amplicon and metagenomics
+    # this is the old code when i needed both
+    # if args.assay == "MethylSeq":
+    #     df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
 
-    else:
-        df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+    # else:
+    #     df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+
+    df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
 
     df.columns = ["counts"]
     raw_counts = df.counts.tolist()
@@ -894,14 +906,18 @@ def get_read_count_stats():
     # for filtered
     zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + filtered_multiqc_zip)
 
-    # methylseq workflow has these nested, e.g., filtered_multiqc_report/filtered_multiqc_data/multiqc_general_stats.txt
-    # right now, amplicon and metagenomics have filtered_multiqc_report/multiqc_general_stats.txt
-    if args.assay == "MethylSeq":
-        df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+    # methylseq workflow had these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
+    # amplicon and metagenomics had raw_multiqc_report/multiqc_general_stats.txt
+    # i'm in the process of adjusting amplicon and metagenomics
+    # this is the old code when i needed both
+    # if args.assay == "MethylSeq":
+    #     df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
 
-    else:
+    # else:
 
-        df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+    #     df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+
+    df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
 
     df.columns = ["counts"]
     filtered_counts = df.counts.tolist()
