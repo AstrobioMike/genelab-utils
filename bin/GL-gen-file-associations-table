@@ -39,6 +39,8 @@ parser.add_argument("--include-raw-multiqc-in-output", help = "Provide this flag
                     action = "store_true")
 parser.add_argument("--use-sample-names-from-assay-table", help = "Provide this flag if the unique filename strings in the processed outputs are taken directly from the \
                                                                    'Sample Name' column of the input assay table.", action = "store_true")
+parser.add_argument("--additional-string-to-remove-from-unique-filenames", help = "If there is any additional text to remove from unqiue filenames, it can \
+                                                                   be provided here.", action = "store")
 
 
 if len(sys.argv)==1:
@@ -265,6 +267,10 @@ def get_sample_names_and_unique_filenames(assay_table):
 
             unique_filename_prefixes.append(curr_name)
 
+    if args.additional_string_to_remove_from_unique_filenames:
+
+        unique_filename_prefixes = [x.replace(args.additional_string_to_remove_from_unique_filenames, "") for x in unique_filename_prefixes]
+
     return(sample_names, unique_filename_prefixes)
 
 
@@ -340,11 +346,11 @@ def get_read_count_from_df(sample_name, read_counts_tab):
 
     if args.single_ended:
 
-        return(round(read_counts_tab.at[str(sample_name) + raw_suffix.replace(".fastq.gz", ""), "counts"]))
+        return(round(read_counts_tab.at[str(sample_name) + raw_suffix.replace("_raw.fastq.gz", ""), "counts"]))
 
     else:
 
-        return(round(read_counts_tab.at[str(sample_name) + raw_R1_suffix.replace(".fastq.gz", ""), "counts"]))
+        return(round(read_counts_tab.at[str(sample_name) + raw_R1_suffix.replace("_raw.fastq.gz", ""), "counts"]))
 
 
 def gen_and_write_out_amplicon_filenames_table(unique_filename_prefixes, mapping_tab, read_count_tab, sample_file_dict):
@@ -665,6 +671,7 @@ def gen_and_write_out_methylseq_filenames_table(unique_filename_prefixes, mappin
         # bismark alignment files
         curr_align_files = [file_prefix + file for file in os.listdir(bismark_alignments_dir) if file.startswith(sample + "_bismark")]
         curr_align_files.append(align_reports_file)
+        curr_align_files.append(bismark_index_zip)
 
         # meth calls files
         curr_meth_call_files = [file_prefix + file for file in os.listdir(bismark_meth_calls_dir) if file.startswith(sample + "_bismark")]
@@ -707,7 +714,7 @@ filtered_R1_suffix = "_R1_filtered.fastq.gz"
 filtered_R2_suffix = "_R2_filtered.fastq.gz"
 raw_multiqc_zip = "raw_multiqc_report.zip"
 filtered_multiqc_zip = "filtered_multiqc_report.zip"
-
+raw_multiqc_stats_file_path = str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"
 
 if args.assay == "Amplicon":
 
@@ -729,7 +736,6 @@ if args.assay == "Amplicon":
     primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
     primer_trimmed_R2_suffix = "_R2_trimmed.fastq.gz"
 
-    raw_multiqc_stats_file_path = str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"
 
 elif args.assay == "Metagenomics":
 
@@ -758,7 +764,6 @@ elif args.assay == "Metagenomics":
 
     assembly_suffix = "-assembly.fasta"
 
-    raw_multiqc_stats_file_path = str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"
 
 elif args.assay == "MethylSeq":
 
@@ -771,8 +776,6 @@ elif args.assay == "MethylSeq":
     individual_summary_reports_dir = os.path.join(bismark_summary_dir, "Individual_Sample_Reports")
     methylkit_dir = "Differential_Methylation_Analysis_Data/"
 
-
-
     bismark_index_zip = "Bismark_Index.zip"
 
     read_filter_reports_file = file_prefix + "trimgalore-reports.txt"
@@ -781,8 +784,6 @@ elif args.assay == "MethylSeq":
 
     bismark_summary_report_text_file = file_prefix + "bismark_summary_report.txt"
     bismark_summary_report_html_file = file_prefix + "bismark_summary_report.html"
-
-    raw_multiqc_stats_file_path = str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"
 
 
 if __name__ == "__main__":
