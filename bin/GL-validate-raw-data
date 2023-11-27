@@ -14,17 +14,39 @@ import re
 import subprocess
 import shutil
 
+assay_suffixes = {
+    "microarray": "GLmicroarray",
+    "bulkRNAseq": "GLbulkRNAseq",
+    "MethylSeq": "GLMethylSeq",
+    "scRNAseq": "GLscRNAseq",
+    "snRNAseq": "GLsnRNAseq",
+    "scATACseq": "GLscATACseq",
+    "snATACseq": "GLsnATACseq",
+    "smallRNAseq": "GLsmallRNAseq",
+    "AmpSeq": "GLAmpSeq",
+    "metagenomics": "GLmetagenomics",
+    "metatranscriptomics": "GLmetatranscriptomics",
+    "targetSeq": "GLtargetSeq",
+    "targetRNAseq": "GLtargetRNAseq",
+    "nanoporeRNAseq": "GLnanoporeRNAseq",
+    "ST": "GLSpatialTranscriptomics",
+    "WGS": "GLwgs",
+    "proteomics": "GLproteomics",
+    "metabolomics": "GLmetabolomics"
+}
+
 parser = argparse.ArgumentParser(description = "This program validates GeneLab raw datasets, renames files if needed \
                                                 to follow GL convention, checks and/or creates md5s, and \
                                                 runs fastqc and combines its outputs with multiqc. It is meant to be \
                                                 executed in the directory holding the read files. \
                                                 For version info, run `GL-version`.",
-                                 epilog = "Ex. usage: GL-validate-raw-data -g GLDS-480 -n 3")
+                                 epilog = "Ex. usage: GL-validate-raw-data -g GLDS-480 -n 3 -a bulkRNAseq")
 
 required = parser.add_argument_group('required arguments')
 
 required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-480")', action = "store", required = True)
 required.add_argument("-n", "--number-of-samples", help = "The expected number of samples here", action = "store", type = int, required = True)
+required.add_argument("-a", "--assay", help = f"Specify the assay type. Available options are: {', '.join(assay_suffixes.keys())}.", action = "store", type = str)
 
 parser.add_argument("-m", "--md5-file", help = "Include a file holding all md5sum results if avaiable (one will be created if not, or if the filenames are changed)", \
                     action = "store", default = "")
@@ -61,7 +83,7 @@ print(f"Standard GL Suffixes: R1: '{standard_GL_R1_suffix}'; R2: '{standard_GL_R
 md5_output_file = "raw_md5sum.txt"
 md5_check_output_file = str(args.GLDS_ID) + "-raw-md5-check-results.txt"
 fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
-multiqc_output_prefix = "raw_multiqc"
+multiqc_output_prefix = "_".join(["raw_multiqc", assay_suffixes[args.assay]])
 multiqc_data_dir = multiqc_output_prefix + "_data"
 multiqc_html = multiqc_output_prefix + ".html"
 # multiqc_html = multiqc_output_prefix + "_report.html"
@@ -105,6 +127,10 @@ def main():
     if args.single_ended and args.ATACseq:
 
         print_notification("Arguments '--single-ended' and '--ATACseq' can't both be specified. Exiting for now.")
+        sys.exit(1)
+
+    if args.assay not in assay_prefixes.keys():
+        print_notification(f"Argument --assay must be one of the following: {', '.join(assay_suffixes.keys())}.")
         sys.exit(1)
 
     if args.slurm:
