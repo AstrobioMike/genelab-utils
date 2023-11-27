@@ -32,6 +32,12 @@ parser.add_argument("-s", "--single-ended", help = "Add this flag if data are si
 parser.add_argument("--ATACseq", help = "Add this flag if the data are ATACseq (in which case R3 is expected to be the reverse read, and R2 holds barcodes)", action = "store_true")
 parser.add_argument("-k", "--keep-fastqc-files", help = "Add this flag if wanting to keep individual-sample fastqc files", action = "store_true")
 parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
+parser.add_argument("--nodename", help = "Add this flag to specify slurm node to use", action = "store", default = "")
+parser.add_argument("--mem", help = "Add this flag to specify the amount of memory to use", action = "store", default = "")
+parser.add_argument("--exclude_nodename", help = "Add this flag to specify slurm nodes to exclude. This overrides any --nodename supplied.", action = "store", default = "")
+parser.add_argument("--queue", help = "Add this flag to specify slurm queue to use", action = "store", default = "normal")
+parser.add_argument('--HRremoved-suffix', action='store_true', 
+                    help='Set this flag to indicate that "HRremoved" suffix is expected.')
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -40,16 +46,17 @@ if len(sys.argv)==1:
 args = parser.parse_args()
 
 # currently hard-coded things we may want to adjust
-R1_designations = ["_R1_", "_R1.", "-R1.", "-R1-"]
-R2_designations = ["_R2_", "_R2.", "-R2.", "-R2-"]
+R1_designations = ["_R1_", "_R1.", "-R1.", "-R1-", ".R1.", "_1."]
+R2_designations = ["_R2_", "_R2.", "-R2.", "-R2-", ".R2.", "_2."]
 extensions = [".fq", ".fastq"]
-standard_GL_R1_suffix = "_R1_raw.fastq.gz"
-standard_GL_R2_suffix = "_R2_raw.fastq.gz"
-standard_GL_SE_suffix = "_raw.fastq.gz"
+standard_GL_R1_suffix = "_R1_raw.fastq.gz" if not args.HRremoved_suffix else "_R1_HRremoved_raw.fastq.gz"
+standard_GL_R2_suffix = "_R2_raw.fastq.gz" if not args.HRremoved_suffix else "_R2_HRremoved_raw.fastq.gz"
+standard_GL_SE_suffix = "_raw.fastq.gz" if not args.HRremoved_suffix else "_HRremoved_raw.fastq.gz"
 
 # additional ones for ATACseq
-R3_designations = ["_R3_", "_R3.", "-R3.", "-R3-"]
-standard_GL_R3_suffix = "_R3_raw.fastq.gz"
+R3_designations = ["_R3_", "_R3.", "-R3.", "-R3-", ".R3.", "_3."]
+standard_GL_R3_suffix = "_R3_raw.fastq.gz" # ADD THIS IF ATACseq also needs to allow `HRremoved` in suffix at user request: if not args.HRremoved_suffix else "_R3_HRremoved_raw.fastq.gz"
+print(f"Standard GL Suffixes: R1: '{standard_GL_R1_suffix}'; R2: '{standard_GL_R2_suffix}'; R_SE: '{standard_GL_SE_suffix}'; R3 (ATACseq) '{standard_GL_R3_suffix}'")
 
 md5_output_file = "raw_md5sum.txt"
 md5_check_output_file = str(args.GLDS_ID) + "-raw-md5-check-results.txt"
@@ -73,7 +80,22 @@ if args.slurm:
     sbatch_file = str(args.GLDS_ID) + "-raw-validation.slurm"
     slurm_out_file = str(args.GLDS_ID) + "-raw-validation-slurm.out"
     slurm_job_name = str(args.GLDS_ID) + "-raw-validation"
-    slurm_mem = 3000
+    slurm_queue = str(args.queue)
+
+    # This section makes memory allocated via the --mem option override the default of 20GB
+    if args.mem:
+        slurm_mem = str(args.mem)
+    else:
+        slurm_mem = 20000
+
+    # This sections makes `exclusions` override any supplied nodelist!
+    if args.exclude_nodename:
+        slurm_node_exclusions = str(args.exclude_nodename)
+        slurm_node = False
+    else:
+        slurm_node = str(args.nodename)
+        slurm_node_exclusions = False
+
 
 ################################################################################
 
@@ -1250,6 +1272,9 @@ def run_fastqc_and_multiqc(map_dict, problem_files_list):
 
     print_notification("Running fastqc...")
 
+    # set JAVA options to allow fastqc to use up to 8GB of heap memory
+    os.environ["_JAVA_OPTIONS"] = "-Xmx8g"
+
     # making list of all files
     list_of_all_files = []
 
@@ -1660,8 +1685,13 @@ def submit_slurm():
 
         out.write('#SBATCH --job-name=' + str(slurm_job_name) + "\n")
         out.write('#SBATCH --output=' + str(slurm_out_file) + "\n")
+        if slurm_node_exclusions:
+            out.write('#SBATCH --exclude=' + str(slurm_node_exclusions) + "\n")
+        if slurm_node:
+            out.write('#SBATCH --nodelist=' + str(slurm_node) + "\n")
+        out.write('#SBATCH --partition=' + str(slurm_queue) + "\n")
         out.write('#SBATCH --mem=' + str(slurm_mem) + "\n\n")
-
+	
         out.write('# sourcing user profile\n')
         out.write('. ~/.profile\n\n')
 
