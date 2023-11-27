@@ -129,7 +129,7 @@ def main():
         print_notification("Arguments '--single-ended' and '--ATACseq' can't both be specified. Exiting for now.")
         sys.exit(1)
 
-    if args.assay not in assay_prefixes.keys():
+    if args.assay not in assay_suffixes.keys():
         print_notification(f"Argument --assay must be one of the following: {', '.join(assay_suffixes.keys())}.")
         sys.exit(1)
 
