@@ -31,6 +31,7 @@ required.add_argument('--ref', help = "The primary target organism/clade",
                                                                     'B-distachyon',
                                                                     'R-norvegicus',
                                                                     'L-heterotoma',
+                                                                    'L-boulardi',
                                                                     'Escherichia',
                                                                     'Mycobacterium',
                                                                     'Pseudomonas',
@@ -50,6 +51,9 @@ parser.add_argument("--reads-to-scan", help = "In the case with some datasets, e
 parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
 
 parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
+parser.add_argument("--nodename", help = "Add this flag to specify slurm node to use", action = "store", default = "")
+parser.add_argument("--exclude_nodename", help = "Add this flag to specify slurm nodes to exclude. This overrides any --nodename supplied.", action = "store", default = "")
+parser.add_argument("--queue", help = "Add this flag to specify slurm queue to use", action = "store", default = "normal")
 
 
 if len(sys.argv)==1:
@@ -72,7 +76,8 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
                            "Mus-musculus": "rrna-Mmusculus.fasta",
                            "R-norvegicus": "rrna-Rnorvegicus.fasta",
                            "Streptococcus": "rrna-Streptococcus.fasta",
-                           "L-heterotoma": "rrna-Lheterotoma.fasta"}
+                           "L-heterotoma": "rrna-Lheterotoma.fasta",
+                           "L-boulardi": "rrna-Lboulardi.fasta"}
 
 # setting date retrieved (will eventually need to adjust/efficiency-ize this as more are added)
 if args.ref == "Mycobacterium":
@@ -81,6 +86,8 @@ elif args.ref == "G-hirsutum":
     data_of_rRNA_refs_fetched = "10-Apr-2023"
 elif args.ref == "L-heterotoma":
     data_of_rRNA_refs_fetched = "14-Jun-2023"
+elif args.ref == "L-boulardi":
+    data_of_rRNA_refs_fetched = "19-Oct-2023"
 else:
     data_of_rRNA_refs_fetched = "01-Sep-2021"
 
