@@ -46,7 +46,7 @@ required = parser.add_argument_group('required arguments')
 
 required.add_argument("-g", "--GLDS-ID", help = 'GLDS ID (e.g. "GLDS-480")', action = "store", required = True)
 required.add_argument("-n", "--number-of-samples", help = "The expected number of samples here", action = "store", type = int, required = True)
-required.add_argument("-a", "--assay", help = f"Specify the assay type. Available options are: {', '.join(assay_suffixes.keys())}.", action = "store", type = str)
+required.add_argument("-a", "--assay", help = f"Specify the assay type. Available options are: {', '.join(assay_suffixes.keys())}.", action = "store", type = str, required = True)
 
 parser.add_argument("-m", "--md5-file", help = "Include a file holding all md5sum results if avaiable (one will be created if not, or if the filenames are changed)", \
                     action = "store", default = "")
@@ -57,9 +57,8 @@ parser.add_argument("--slurm", help = "Add this flag to submit the job through s
 parser.add_argument("--nodename", help = "Add this flag to specify slurm node to use", action = "store", default = "")
 parser.add_argument("--mem", help = "Add this flag to specify the amount of memory to use", action = "store", default = "")
 parser.add_argument("--exclude_nodename", help = "Add this flag to specify slurm nodes to exclude. This overrides any --nodename supplied.", action = "store", default = "")
-parser.add_argument("--queue", help = "Add this flag to specify slurm queue to use", action = "store", default = "normal")
-parser.add_argument('--HRremoved-suffix', action='store_true', 
-                    help='Set this flag to indicate that "HRremoved" suffix is expected.')
+parser.add_argument("--queue", help = "Add this flag to specify slurm queue to use (default = 'normal')", action = "store", default = "normal")
+parser.add_argument('--HRremoved-suffix', action='store_true', help='Set this flag to indicate that "HRremoved" suffix is expected.')
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -78,7 +77,7 @@ standard_GL_SE_suffix = "_raw.fastq.gz" if not args.HRremoved_suffix else "_HRre
 # additional ones for ATACseq
 R3_designations = ["_R3_", "_R3.", "-R3.", "-R3-", ".R3.", "_3."]
 standard_GL_R3_suffix = "_R3_raw.fastq.gz" # ADD THIS IF ATACseq also needs to allow `HRremoved` in suffix at user request: if not args.HRremoved_suffix else "_R3_HRremoved_raw.fastq.gz"
-print(f"Standard GL Suffixes: R1: '{standard_GL_R1_suffix}'; R2: '{standard_GL_R2_suffix}'; R_SE: '{standard_GL_SE_suffix}'; R3 (ATACseq) '{standard_GL_R3_suffix}'")
+# print(f"Standard GL Suffixes: R1: '{standard_GL_R1_suffix}'; R2: '{standard_GL_R2_suffix}'; R_SE: '{standard_GL_SE_suffix}'; R3 (ATACseq) '{standard_GL_R3_suffix}'")
 
 md5_output_file = "raw_md5sum.txt"
 md5_check_output_file = str(args.GLDS_ID) + "-raw-md5-check-results.txt"
