@@ -79,7 +79,7 @@ R3_designations = ["_R3_", "_R3.", "-R3.", "-R3-", ".R3.", "_3."]
 standard_GL_R3_suffix = "_R3_raw.fastq.gz" # ADD THIS IF ATACseq also needs to allow `HRremoved` in suffix at user request: if not args.HRremoved_suffix else "_R3_HRremoved_raw.fastq.gz"
 # print(f"Standard GL Suffixes: R1: '{standard_GL_R1_suffix}'; R2: '{standard_GL_R2_suffix}'; R_SE: '{standard_GL_SE_suffix}'; R3 (ATACseq) '{standard_GL_R3_suffix}'")
 
-md5_output_file = "raw_md5sum.txt"
+md5_output_file = f"raw_md5sum_{assay_suffixes[args.assay]}.txt"
 md5_check_output_file = str(args.GLDS_ID) + "-raw-md5-check-results.txt"
 fastqc_threads = 8 # allocates 250 MB memory per thread, so 8 is 2 GB
 multiqc_output_prefix = "_".join(["raw_multiqc", assay_suffixes[args.assay]])
