@@ -49,7 +49,7 @@ parser.add_argument("--reads-to-scan", help = "In the case with some datasets, e
                                        choices = ["R1", "R2"])
 
 parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
-parser.add_argument("--directRNAseq", help = "Add this flag if data are actualy RNA sequences that have U's instead of T's", action = "store_true")
+parser.add_argument("--directRNAseq", help = "Add this flag if data are actually RNA sequences that have U's instead of T's", action = "store_true")
 
 parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
 parser.add_argument("--nodename", help = "Add this flag to specify slurm node to use", action = "store", default = "")
