@@ -31,6 +31,9 @@ required.add_argument('workflow', choices = ['MG-Illumina',
                                            'MethylSeq'],
                                            help = "The first positional argument should be which one of these workflows you'd like to download")
 
+parser.add_argument("--list-available-versions", help = "Provide this flag along with a specified workflow in order to get a printout of available versions",
+                    action = "store_true")
+
 parser.add_argument("--wanted-version", help = "Specify the version you'd like to download (leaving out this argument will pull the latest by default)")
 
 if len(sys.argv)==1:
@@ -49,6 +52,7 @@ if args.workflow == "MethylSeq":
 
     base_download_link = base_repo + "releases/download/"
     releases_page_link = "https://api.github.com/repos/astrobiomike/GL-MethylSeq-WF-dev/releases"
+    html_releases_page = base_repo + "releases"
 
 
 else:
@@ -57,27 +61,27 @@ else:
 
     base_download_link = base_repo + "releases/download/"
     releases_page_link = "https://api.github.com/repos/nasa/GeneLab_Data_Processing/releases"
+    html_releases_page = base_repo + "releases"
 
 
 # core workflow info
 workflow_dict = {
 
     "MG-Illumina": { "basename": "SW_MGIllumina" },
-    "MG-remove-human-reads": { "basename": "SW_MGRemoveHumanReads-A" },
+    "MG-remove-human-reads": { "basename": "SW_MGRemoveHumanReads" },
     "MG-estimate-host-reads": { "basename": "SW_MGEstHostReads" },
-    "Amplicon-Illumina": { "basename": "SW_AmpIllumina-A" },
+    "Amplicon-Illumina": { "basename": "SW_AmpIllumina" },
     "Amplicon-454-IonTorrent": { "basename": "SW_Amp454IonTor" },
-    "RNAseq": { "basename": "NF_RCP-F" },
+    "RNAseq": { "basename": "NF_RCP" },
     "MethylSeq": { "basename": "NF_MethylSeq" }
 
 }
-
 
 ################################################################################
 
 def main():
 
-    dl_wf(args.workflow)
+    dl_wf()
 
 ################################################################################
 
@@ -106,9 +110,12 @@ def report_message(message, color = "yellow"):
     wprint(color_text(message, color))
 
 
-def get_versions_available(target_wf) -> list:
+def get_versions_available(target_wf):
 
-    """ this finds which versions are available on the release page and returns them as a list """
+    """ 
+    This finds which versions are available on the release page and returns them as a list,
+    and creates a dictionary holding the versions as keys and full workflow names as values.
+    """
 
     # accessing release page in json format
     releases_data = json.loads(urlopen(releases_page_link).read())
@@ -121,6 +128,9 @@ def get_versions_available(target_wf) -> list:
     # starting empty list of available versions
     available_versions = []
 
+    # starting empty dictionary to hold version: full_workflow_basename
+    dict_of_versions_and_basenames = {}
+
     for link in links:
 
         # getting just those for the requested workflow
@@ -131,12 +141,17 @@ def get_versions_available(target_wf) -> list:
 
                 # cutting out just the version info
                 link_basename = os.path.basename(link)
-                link_version = link_basename.replace(target_wf + "_", "").replace(".zip", "")
-
+                version_info_underscore_index = link_basename.rfind('_')
+                link_version = link_basename[version_info_underscore_index + 1:]
+                
                 # adding to list
                 available_versions.append(link_version)
 
-    return(available_versions)
+                # adding to dictionary of verisons 
+                dict_of_versions_and_basenames[link_version] = link_basename
+
+
+    return(available_versions, dict_of_versions_and_basenames)
 
 
 def check_version_available(wanted_version, available_versions):
@@ -205,29 +220,47 @@ def download_and_unzip(target_link):
     print(f"\n    It was pulled from this release page:\n         {releases_page_link}\n")
 
 
-def dl_wf(target_wf):
+def dl_wf():
 
     """ main download function """
 
     # getting the specific filename/directory name for the requested workflow (e.g. "MG-Illumina" is "SW_MGIllumina")
-    basename = workflow_dict[args.workflow]["basename"]
+    wf_basename = workflow_dict[args.workflow]["basename"]
 
     # getting which versions are available for download
-    available_versions = get_versions_available(basename)
+    available_versions, dict_of_versions_and_basenames = get_versions_available(wf_basename)
 
     # sorting (so we can grab the latest if needed)
     available_versions = sorted(available_versions, key = lambda x: version.Version(x), reverse = True)
+
+    # just reporting available versions if requested
+    if args.list_available_versions:
+
+        print(f"\n    Versions available for the {args.workflow} workflow include:\n")
+
+        for each_version in available_versions:
+
+            print(f"        {each_version}")
+
+        print(f"\n    You can also browse these at the releases page:\n")
+        print(f"        {html_releases_page}\n")
+        
+        print(f"    And you can find information about differences between versions at this workflow's CHANGELOG.md at the above-linked repo.\n")
+
+        exit(0)
 
     if args.wanted_version:
 
         # checking specified version exists and exiting if not
         check_version_available(args.wanted_version, available_versions)
 
-        full_target_name = basename + "_" + args.wanted_version
+        full_target_name = dict_of_versions_and_basenames[args.wanted_version]
+        # full_target_name = wf_basename + "_" + args.wanted_version
 
     else:
 
-        full_target_name = basename + "_" + available_versions[0]
+        # full_target_name = wf_basename + "_" + available_versions[0]
+        full_target_name = dict_of_versions_and_basenames[available_versions[0]]
 
     # building full download link
     full_link = base_download_link + full_target_name + "/" + full_target_name + ".zip"
