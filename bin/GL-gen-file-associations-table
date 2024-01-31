@@ -382,16 +382,16 @@ def gen_and_write_out_amplicon_filenames_table(unique_filename_prefixes, mapping
         fastqc = [file_prefix + output_prefix + filtered_multiqc_zip]
 
     if args.type == "ASVs":
-        rep_seq_output = file_prefix + output_prefix + "ASVs.fasta"
+        rep_seq_output = file_prefix + output_prefix + f"ASVs_{assay_suffix}.fasta"
     else:
-        rep_seq_output = file_prefix + output_prefix + "OTUs.fasta"
+        rep_seq_output = file_prefix + output_prefix + f"OTUs_{assay_suffix}.fasta"
 
     final_outputs = [rep_seq_output, 
-                     file_prefix + output_prefix + "counts.tsv", 
-                     file_prefix + output_prefix + "read-count-tracking.tsv", 
-                     file_prefix + output_prefix + "taxonomy-and-counts.biom.zip", 
-                     file_prefix + output_prefix + "taxonomy-and-counts.tsv", 
-                     file_prefix + output_prefix + "taxonomy.tsv"]
+                     file_prefix + output_prefix + f"counts_{assay_suffix}.tsv", 
+                     file_prefix + output_prefix + f"read-count-tracking_{assay_suffix}.tsv", 
+                     file_prefix + output_prefix + f"taxonomy-and-counts_{assay_suffix}.biom.zip", 
+                     file_prefix + output_prefix + f"taxonomy-and-counts_{assay_suffix}.tsv", 
+                     file_prefix + output_prefix + f"taxonomy_{assay_suffix}.tsv"]
 
     processing_info = file_prefix + output_prefix + "processing_info.zip"
 
@@ -412,12 +412,25 @@ def gen_and_write_out_amplicon_filenames_table(unique_filename_prefixes, mapping
             else:
                 curr_raw_data = [raw_file_prefix + sample + raw_suffix]
 
-            curr_trimmed_data = [file_prefix + sample + primer_trimmed_suffix, 
-                                 file_prefix + output_prefix + "trimmed-read-counts.tsv", 
-                                 file_prefix + output_prefix + "cutadapt.log"]
+            # if only forward read was used, then we still want to include the _R1 portion of the filename
+            if args.R1_used_as_single_ended_data:
+                curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, 
+                                    file_prefix + output_prefix + f"trimmed-read-counts_{assay_suffix}.tsv", 
+                                    file_prefix + output_prefix + f"cutadapt_{assay_suffix}.log"]
 
-            curr_filt_data = [file_prefix + sample + filtered_suffix, 
-                              file_prefix + output_prefix + "filtered-read-counts.tsv"]
+            else:
+                curr_trimmed_data = [file_prefix + sample + primer_trimmed_suffix, 
+                                    file_prefix + output_prefix + f"trimmed-read-counts_{assay_suffix}.tsv", 
+                                    file_prefix + output_prefix + f"cutadapt_{assay_suffix}.log"]
+
+            # if only forward read was used, then we still want to include the _R1 portion of the filename
+            if args.R1_used_as_single_ended_data:
+                 curr_filt_data = [file_prefix + sample + filtered_R1_suffix, 
+                                  file_prefix + output_prefix + f"filtered-read-counts_{assay_suffix}.tsv"]
+
+            else:
+                curr_filt_data = [file_prefix + sample + filtered_suffix, 
+                                  file_prefix + output_prefix + f"filtered-read-counts_{assay_suffix}.tsv"]
 
 
         else:
@@ -425,11 +438,11 @@ def gen_and_write_out_amplicon_filenames_table(unique_filename_prefixes, mapping
             curr_raw_data = [raw_file_prefix + sample + raw_R1_suffix, raw_file_prefix + sample + raw_R2_suffix]
             curr_trimmed_data = [file_prefix + sample + primer_trimmed_R1_suffix, 
                                  file_prefix + sample + primer_trimmed_R2_suffix, 
-                                 file_prefix + output_prefix + "trimmed-read-counts.tsv", 
-                                 file_prefix + output_prefix + "cutadapt.log"]
+                                 file_prefix + output_prefix + f"trimmed-read-counts_{assay_suffix}.tsv", 
+                                 file_prefix + output_prefix + f"cutadapt_{assay_suffix}.log"]
             curr_filt_data = [file_prefix + sample + filtered_R1_suffix, 
                               file_prefix + sample + filtered_R2_suffix, 
-                              file_prefix + output_prefix + "filtered-read-counts.tsv"]
+                              file_prefix + output_prefix + f"filtered-read-counts_{assay_suffix}.tsv"]
 
         curr_read_count = get_read_count_from_df(sample, read_count_tab)
 
@@ -712,13 +725,20 @@ filtered_reads_dir = "Filtered_Sequence_Data/"
 filtered_suffix = "_filtered.fastq.gz"
 filtered_R1_suffix = "_R1_filtered.fastq.gz"
 filtered_R2_suffix = "_R2_filtered.fastq.gz"
-raw_multiqc_zip = "raw_multiqc_report.zip"
-filtered_multiqc_zip = "filtered_multiqc_report.zip"
-raw_multiqc_stats_file_path = str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"
+
+# just in case user only specified --R1-used-as-single-ended, but didn't specify --single-ended
+if args.R1_used_as_single_ended_data:
+    args.single_ended = True
 
 if args.assay == "Amplicon":
 
     file_prefix = args.GLDS_ID + "_GAmplicon_"
+
+    assay_suffix = "GLAmpSeq"
+
+    raw_multiqc_zip = f"raw_multiqc_{assay_suffix}_report.zip"
+    filtered_multiqc_zip = f"filtered_multiqc_{assay_suffix}_report.zip"
+    raw_multiqc_stats_file_path = str(output_prefix) + f"raw_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}raw_multiqc_data/multiqc_general_stats.txt"
 
     # this one is only used for the raw data files
     raw_file_prefix = args.GLDS_ID + "_Amplicon_"
@@ -740,6 +760,12 @@ if args.assay == "Amplicon":
 elif args.assay == "Metagenomics":
 
     file_prefix = args.GLDS_ID + "_GMetagenomics_"
+
+    assay_suffix = "GLmetagenomics"
+
+    raw_multiqc_zip = f"raw_multiqc_{assay_suffix}_report.zip"
+    filtered_multiqc_zip = f"filtered_multiqc_{assay_suffix}_report.zip"
+    raw_multiqc_stats_file_path = str(output_prefix) + f"raw_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}raw_multiqc_data/multiqc_general_stats.txt"
 
     # this one is only used for the raw data files
     raw_file_prefix = args.GLDS_ID + "_metagenomics_"
@@ -768,6 +794,12 @@ elif args.assay == "Metagenomics":
 elif args.assay == "MethylSeq":
 
     file_prefix = args.GLDS_ID + "_Gwgbs_"
+
+    assay_suffix = "GLMethylSeq"
+
+    raw_multiqc_zip = f"raw_multiqc_{assay_suffix}_report.zip"
+    filtered_multiqc_zip = f"filtered_multiqc_{assay_suffix}_report.zip"
+    raw_multiqc_stats_file_path = str(output_prefix) + f"raw_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}raw_multiqc_data/multiqc_general_stats.txt"
 
     ref_files_dir = "Reference_Genome_Files/"
     bismark_alignments_dir = "Bismark_Alignments/"

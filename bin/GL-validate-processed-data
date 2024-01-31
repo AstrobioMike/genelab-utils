@@ -287,7 +287,7 @@ def check_multiqc_outputs(sample_names):
     """ makes sure all samples' read files are in the multiqc outputs """
 
     # checking raw
-    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + raw_multiqc_zip)
+    zip_file = zipfile.ZipFile(fastqc_dir + raw_multiqc_zip)
 
     # methylseq workflow had these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
     # amplicon and metagenomics had raw_multiqc_report/multiqc_general_stats.txt
@@ -299,7 +299,7 @@ def check_multiqc_outputs(sample_names):
     # else:
     #     df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
 
-    df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    df = pd.read_csv(zip_file.open(raw_multiqc_stats_file_path), sep = "\t", usecols = ["Sample"])
 
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
@@ -316,14 +316,14 @@ def check_multiqc_outputs(sample_names):
 
     else:
 
-        suffix = raw_suffix.split(".")[0]
+        suffix = raw_suffix.split(".")[0].replace("_raw", "")
 
         for sample in sample_names:
             if not sample + suffix in file_prefixes_in_multiqc and not sample in file_prefixes_in_multiqc:
                 report_failure("The raw multiqc output is missing the expected '" + sample + suffix + "' entry.")
 
     # checking filtered
-    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + filtered_multiqc_zip)
+    zip_file = zipfile.ZipFile(fastqc_dir + filtered_multiqc_zip)
 
     # methylseq workflow had these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
     # amplicon and metagenomics had raw_multiqc_report/multiqc_general_stats.txt
@@ -336,7 +336,7 @@ def check_multiqc_outputs(sample_names):
 
     #     df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
     
-    df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = ["Sample"])
+    df = pd.read_csv(zip_file.open(filtered_multiqc_stats_file_path), sep = "\t", usecols = ["Sample"])
 
     file_prefixes_in_multiqc = df["Sample"].tolist()
 
@@ -353,7 +353,7 @@ def check_multiqc_outputs(sample_names):
 
     else:
 
-        suffix = filtered_suffix.split(".")[0]
+        suffix = filtered_suffix.split(".")[0].replace("_filtered", "")
         for sample in sample_names:
             if not sample + suffix in file_prefixes_in_multiqc and not sample in file_prefixes_in_multiqc:
                 report_failure("The filtered multiqc output is missing the expected '" + sample + suffix + "' entry.")
@@ -881,7 +881,7 @@ def get_read_count_stats():
     """ grabs read counts and summarizes """
 
     # for raw
-    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + raw_multiqc_zip)
+    zip_file = zipfile.ZipFile(fastqc_dir + raw_multiqc_zip)
 
     # methylseq workflow had these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
     # amplicon and metagenomics had raw_multiqc_report/multiqc_general_stats.txt
@@ -893,7 +893,7 @@ def get_read_count_stats():
     # else:
     #     df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
 
-    df = pd.read_csv(zip_file.open(str(output_prefix) + raw_multiqc_zip.split(".")[0] + "/raw_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+    df = pd.read_csv(zip_file.open(raw_multiqc_stats_file_path), sep = "\t", usecols = [5])
 
     df.columns = ["counts"]
     raw_counts = df.counts.tolist()
@@ -904,7 +904,7 @@ def get_read_count_stats():
     raw_min, raw_max, raw_mean, raw_median = gen_stats(raw_counts)
 
     # for filtered
-    zip_file = zipfile.ZipFile(fastqc_dir + str(output_prefix) + filtered_multiqc_zip)
+    zip_file = zipfile.ZipFile(fastqc_dir + filtered_multiqc_zip)
 
     # methylseq workflow had these nested, e.g., raw_multiqc_report/raw_multiqc_data/multiqc_general_stats.txt
     # amplicon and metagenomics had raw_multiqc_report/multiqc_general_stats.txt
@@ -917,7 +917,7 @@ def get_read_count_stats():
 
     #     df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
 
-    df = pd.read_csv(zip_file.open(str(output_prefix) + filtered_multiqc_zip.split(".")[0] + "/filtered_multiqc_data/multiqc_general_stats.txt"), sep = "\t", usecols = [5])
+    df = pd.read_csv(zip_file.open(filtered_multiqc_stats_file_path), sep = "\t", usecols = [5])
 
     df.columns = ["counts"]
     filtered_counts = df.counts.tolist()
@@ -962,26 +962,30 @@ def get_read_count_stats():
 output_prefix = str(args.output_prefix)
 fastqc_dir = "FastQC_Outputs/"
 filtered_reads_dir = "Filtered_Sequence_Data/"
-raw_multiqc_zip = "raw_multiqc_report.zip"
-filtered_multiqc_zip = "filtered_multiqc_report.zip"
 processing_zip_file = output_prefix + "processing_info.zip"
 
-
+# just in case user only specified --R1-used-as-single-ended, but didn't specify --single-ended
+if args.R1_used_as_single_ended_data:
+    args.single_ended = True
 
 # setting up when assay is amplicon
 if args.assay == "Amplicon":
 
     V_V_guidelines_link = "https://genelab-tools.arc.nasa.gov/confluence/pages/viewpage.action?pageId=2428598"
 
+    assay_suffix = "GLAmpSeq"
+
     trimmed_reads_dir = "Trimmed_Sequence_Data/"
     final_outputs_dir = "Final_Outputs/"
+
+    raw_multiqc_zip = str(output_prefix) + f"raw_multiqc_{assay_suffix}_report.zip"
+    filtered_multiqc_zip = str(output_prefix) + f"filtered_multiqc_{assay_suffix}_report.zip"
+    raw_multiqc_stats_file_path = str(output_prefix) + f"raw_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}raw_multiqc_data/multiqc_general_stats.txt"
+    filtered_multiqc_stats_file_path = str(output_prefix) + f"filtered_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}filtered_multiqc_data/multiqc_general_stats.txt"
 
     raw_suffix = "_raw.fastq.gz"
     raw_R1_suffix = "_R1_raw.fastq.gz"
     raw_R2_suffix = "_R2_raw.fastq.gz"
-
-    if args.R1_used_as_single_ended_data:
-        raw_suffix = raw_R1_suffix = "_R1_raw.fastq.gz"
 
     primer_trimmed_suffix = "_trimmed.fastq.gz"
     primer_trimmed_R1_suffix = "_R1_trimmed.fastq.gz"
@@ -990,9 +994,13 @@ if args.assay == "Amplicon":
     filtered_R1_suffix = "_R1_filtered.fastq.gz"
     filtered_R2_suffix = "_R2_filtered.fastq.gz"
 
-    expected_trimmed_outputs_or_suffixes = [output_prefix + "cutadapt.log", output_prefix + "trimmed-read-counts.tsv"]
-    expected_filtered_outputs_or_suffixes = ["filtered-read-counts.tsv"]
-    expected_final_outputs_or_suffixes = [".fasta", output_prefix + "counts.tsv", output_prefix + "taxonomy.tsv", ".biom.zip", output_prefix + "taxonomy-and-counts.tsv", output_prefix + "read-count-tracking.tsv"]
+    if args.R1_used_as_single_ended_data:
+        raw_suffix = raw_R1_suffix = "_R1_raw.fastq.gz"
+        filtered_suffix = filtered_R1_suffix = "_R1_filtered.fastq.gz"
+
+    expected_trimmed_outputs_or_suffixes = [output_prefix + f"cutadapt_{assay_suffix}.log", output_prefix + f"trimmed-read-counts_{assay_suffix}.tsv"]
+    expected_filtered_outputs_or_suffixes = [f"filtered-read-counts_{assay_suffix}.tsv"]
+    expected_final_outputs_or_suffixes = [".fasta", output_prefix + f"counts_{assay_suffix}.tsv", output_prefix + f"taxonomy_{assay_suffix}.tsv", ".biom.zip", output_prefix + f"taxonomy-and-counts_{assay_suffix}.tsv", output_prefix + f"read-count-tracking_{assay_suffix}.tsv"]
 
     expected_dirs = [fastqc_dir, filtered_reads_dir, final_outputs_dir]
 
@@ -1010,6 +1018,13 @@ if args.assay == "Amplicon":
 elif args.assay == "Metagenomics":
 
     V_V_guidelines_link = "https://genelab-tools.arc.nasa.gov/confluence/pages/viewpage.action?pageId=8225175"
+
+    assay_suffix = "GLmetagenomics"
+
+    raw_multiqc_zip = str(output_prefix) + f"raw_multiqc_{assay_suffix}_report.zip"
+    filtered_multiqc_zip = str(output_prefix) + f"filtered_multiqc_{assay_suffix}_report.zip"
+    raw_multiqc_stats_file_path = str(output_prefix) + f"raw_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}raw_multiqc_data/multiqc_general_stats.txt"
+    filtered_multiqc_stats_file_path = str(output_prefix) + f"filtered_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}filtered_multiqc_data/multiqc_general_stats.txt"
 
     assembly_based_dir = "Assembly-based_Processing/"
     assemblies_dir = assembly_based_dir + "assemblies/"
@@ -1076,6 +1091,13 @@ elif args.assay == "Metagenomics":
 elif args.assay == "MethylSeq":
 
     V_V_guidelines_link = "https://genelab-tools.arc.nasa.gov/confluence/pages/viewpage.action?pageId=61865999"
+
+    assay_suffix = "GLMethylSeq"
+
+    raw_multiqc_zip = str(output_prefix) + f"raw_multiqc_{assay_suffix}_report.zip"
+    filtered_multiqc_zip = str(output_prefix) + f"filtered_multiqc_{assay_suffix}_report.zip"
+    raw_multiqc_stats_file_path = str(output_prefix) + f"raw_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}raw_multiqc_data/multiqc_general_stats.txt"
+    filtered_multiqc_stats_file_path = str(output_prefix) + f"filtered_multiqc_report.zip".split(".")[0] + f"/{str(output_prefix)}filtered_multiqc_data/multiqc_general_stats.txt"
 
     ref_files_dir = "Reference_Genome_Files/"
     bismark_alignments_dir = "Bismark_Alignments/"
