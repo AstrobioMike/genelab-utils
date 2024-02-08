@@ -56,7 +56,7 @@ parser.add_argument("--ATACseq", help = "Add this flag if the data are ATACseq (
 parser.add_argument("--single-cell", help = "Add this flag if the data are single-cell data (you will also need to specify if there are 3 read-files per sample or 4)", action = "store_true")
 
 parser.add_argument("--number-of-read-files-per-sample", help = "Specify if there are 3 read-files per sample or 4; e.g., if each sample has an R1, R2, R3, and R4, you'd add '--number-of-files-per-sample 4'\
-                    (currently only valide for --single-cell data)", action = "store", type = int, choices = [3,4])
+                    (currently only valid for --single-cell data)", action = "store", type = int, choices = [3,4])
 
 parser.add_argument("-k", "--keep-fastqc-files", help = "Add this flag if wanting to keep individual-sample fastqc files", action = "store_true")
 parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
