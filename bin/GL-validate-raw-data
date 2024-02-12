@@ -15,24 +15,25 @@ import subprocess
 import shutil
 
 assay_suffixes = {
-    "microarray": "GLmicroarray",
-    "bulkRNAseq": "GLbulkRNAseq",
-    "MethylSeq": "GLMethylSeq",
-    "scRNAseq": "GLscRNAseq",
-    "snRNAseq": "GLsnRNAseq",
-    "scATACseq": "GLscATACseq",
-    "snATACseq": "GLsnATACseq",
-    "smallRNAseq": "GLsmallRNAseq",
     "AmpSeq": "GLAmpSeq",
+    "bulkRNAseq": "GLbulkRNAseq",
+    "metabolomics": "GLmetabolomics",
     "metagenomics": "GLmetagenomics",
     "metatranscriptomics": "GLmetatranscriptomics",
+    "MethylSeq": "GLMethylSeq",
+    "microarray": "GLmicroarray",
+    "nanoporeRNAseq": "GLnanoporeRNAseq",
+    "proteomics": "GLproteomics",
+    "scATACseq": "GLscATACseq",
+    "scRNAseq": "GLscRNAseq",
+    "smallRNAseq": "GLsmallRNAseq",
+    "snATACseq": "GLsnATACseq",
+    "snRNAseq": "GLsnRNAseq",
+    "ST": "GLSpatialTranscriptomics",
+    "targetNanoporeDNASeq": "GLTargetNanoporeDNAseq",
     "targetSeq": "GLtargetSeq",
     "targetRNAseq": "GLtargetRNAseq",
-    "nanoporeRNAseq": "GLnanoporeRNAseq",
-    "ST": "GLSpatialTranscriptomics",
-    "WGS": "GLwgs",
-    "proteomics": "GLproteomics",
-    "metabolomics": "GLmetabolomics"
+    "WGS": "GLwgs"
 }
 
 parser = argparse.ArgumentParser(description = "This program validates GeneLab raw datasets, renames files if needed \
