@@ -2,14 +2,13 @@
 cluster:
     mkdir -p slurm-logs &&
     if [ -z {wildcards} ]; then log_wildcard=""; else log_wildcard=$(echo "-{wildcards}" | sed 's/ID=//'); fi  &&
-    sbatch --mem={resources.mem_mb} -c {resources.cpus} -J {rule} -o slurm-logs/{rule}${{log_wildcard}}-%j.log -e slurm-logs/{rule}${{log_wildcard}}-%j.log
+    sbatch --mem={resources.mem_mb} -c {resources.cpus} -J {rule} -o slurm-logs/{rule}${{log_wildcard}}-%j.log -e slurm-logs/{rule}${{log_wildcard}}-%j.log --parsable
 use-conda:
     True
-# conda-prefix:
-#     ${CONDA_PREFIX}/envs
-  # the above won't work because shell variables aren't expanded in here, but it should be replaced with the path output by running `echo ${CONDA_PREFIX}/envs`
+conda-prefix:
+    ${{CONDA_PREFIX}}/envs
 cores:
-    80
+    50
 jobs:
     10
 printshellcmds:
@@ -21,10 +20,9 @@ rerun-incomplete:
 scheduler:
     greedy
 latency-wait:
-    60
-resources:
-    - cpus=80
-    - mem_mb=120000
+    120
 default-resources:
     - cpus=1
-    - mem_mb=2000
+    - mem_mb=6000
+cluster-cancel:
+    scancel
