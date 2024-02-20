@@ -533,7 +533,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
             check_general_fasta_format(curr_fasta_path)
     
     # making sure assembly summary file is there
-    assembly_summary_path = assemblies_dir + output_prefix + "assembly-summaries.tsv"
+    assembly_summary_path = assemblies_dir + output_prefix + f"assembly-summaries_{assay_suffix}.tsv"
 
     if not os.path.exists(assembly_summary_path):
         report_failure("The assembly summary file, " + str(assembly_summary_path) + ", is expected but was not found.")
@@ -625,7 +625,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
         # making sure summary table is there if there are any bins
         if len(output_fasta_bins) > 0:
 
-            bins_summary_path = bins_dir + output_prefix + "bins-overview.tsv"
+            bins_summary_path = bins_dir + output_prefix + f"bins-overview_{assay_suffix}.tsv"
 
             if not os.path.exists(bins_summary_path):
 
@@ -652,7 +652,7 @@ def check_assembly_based_outputs(sample_names, failed_assemblies_list, successfu
         # making sure summary table is there if there are any bins
         if len(output_fasta_bins) > 0:
 
-            MAGs_summary_path = MAGs_dir + output_prefix + "MAGs-overview.tsv"
+            MAGs_summary_path = MAGs_dir + output_prefix + f"MAGs-overview_{assay_suffix}.tsv"
 
             if not os.path.exists(MAGs_summary_path):
 
@@ -1057,27 +1057,25 @@ elif args.assay == "Metagenomics":
 
     assembly_suffix = "-assembly.fasta"
 
-    expected_assembly_combined_outputs = [str(output_prefix) + "Combined-contig-level-taxonomy-coverages-CPM.tsv",
-                                        str(output_prefix) + "Combined-gene-level-KO-function-coverages-CPM.tsv",
-                                        str(output_prefix) + "Combined-gene-level-taxonomy-coverages-CPM.tsv",
-                                        str(output_prefix) + "Combined-contig-level-taxonomy-coverages.tsv",
-                                        str(output_prefix) + "Combined-gene-level-KO-function-coverages.tsv",
-                                        str(output_prefix) + "Combined-gene-level-taxonomy-coverages.tsv"]
+    expected_assembly_combined_outputs = [str(output_prefix) + f"Combined-contig-level-taxonomy-coverages-CPM_{assay_suffix}.tsv",
+                                        str(output_prefix) + f"Combined-gene-level-KO-function-coverages-CPM_{assay_suffix}.tsv",
+                                        str(output_prefix) + f"Combined-gene-level-taxonomy-coverages-CPM_{assay_suffix}.tsv",
+                                        str(output_prefix) + f"Combined-contig-level-taxonomy-coverages_{assay_suffix}.tsv",
+                                        str(output_prefix) + f"Combined-gene-level-KO-function-coverages_{assay_suffix}.tsv",
+                                        str(output_prefix) + f"Combined-gene-level-taxonomy-coverages_{assay_suffix}.tsv"]
 
-    assembly_based_overview_table = assembly_based_dir + str(output_prefix) + "Assembly-based-processing-overview.tsv"
+    assembly_based_overview_table = assembly_based_dir + str(output_prefix) + f"Assembly-based-processing-overview_{assay_suffix}.tsv"
 
-    expected_read_based_outputs = [str(output_prefix) + "Gene-families-KO-cpm.tsv", 
-                                str(output_prefix) + "Gene-families-cpm.tsv", 
-                                str(output_prefix) + "Gene-families-grouped-by-taxa.tsv",
-                                str(output_prefix) + "Gene-families.tsv", 
-                                str(output_prefix) + "Metaphlan-taxonomy.tsv", 
-                                str(output_prefix) + "Pathway-abundances-cpm.tsv",
-                                str(output_prefix) + "Pathway-abundances-grouped-by-taxa.tsv", 
-                                str(output_prefix) + "Pathway-abundances.tsv",
-                                str(output_prefix) + "Pathway-coverages-grouped-by-taxa.tsv", 
-                                str(output_prefix) + "Pathway-coverages.tsv"]
-
-    expected_final_outputs_or_suffixes = [".fasta", "counts.tsv", "taxonomy.tsv", ".biom.zip", "taxonomy-and-counts.tsv", "read-count-tracking.tsv"]
+    expected_read_based_outputs = [str(output_prefix) + f"Gene-families-KO-cpm_{assay_suffix}.tsv", 
+                                str(output_prefix) + f"Gene-families-cpm_{assay_suffix}.tsv", 
+                                str(output_prefix) + f"Gene-families-grouped-by-taxa_{assay_suffix}.tsv",
+                                str(output_prefix) + f"Gene-families_{assay_suffix}.tsv", 
+                                str(output_prefix) + f"Metaphlan-taxonomy_{assay_suffix}.tsv", 
+                                str(output_prefix) + f"Pathway-abundances-cpm_{assay_suffix}.tsv",
+                                str(output_prefix) + f"Pathway-abundances-grouped-by-taxa_{assay_suffix}.tsv", 
+                                str(output_prefix) + f"Pathway-abundances_{assay_suffix}.tsv",
+                                str(output_prefix) + f"Pathway-coverages-grouped-by-taxa_{assay_suffix}.tsv", 
+                                str(output_prefix) + f"Pathway-coverages_{assay_suffix}.tsv"]
 
     expected_zip_contents = ["Snakefile", "config.yaml", "envs/", "logs/", "scripts/", "unique-sample-IDs.txt"]
 
