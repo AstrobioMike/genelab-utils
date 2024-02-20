@@ -213,7 +213,7 @@ def get_sample_names_and_unique_filenames(assay_table):
     # and also removing the common prefixes and suffixes intending to create the same 
     # unique filenames used for processing
 
-    # metagenomics will somethings have _HRremoved_ in the suffix and sometimes not in the assay table (for older datasets)
+    # metagenomics will sometimes have _HRremoved_ in the suffix and sometimes not in the assay table (for older datasets)
     # so dealing with that here with a split
     if args.assay == "Amplicon":
 
@@ -503,51 +503,51 @@ def gen_and_write_out_metagenomics_filenames_table(unique_filename_prefixes, map
         fastqc = [file_prefix + output_prefix + filtered_multiqc_zip]
 
 
-    assembly_overview_tab = file_prefix + output_prefix + "Assembly-based-processing-overview.tsv"
+    assembly_overview_tab = file_prefix + output_prefix + f"Assembly-based-processing-overview_{assay_suffix}.tsv"
 
-    if os.path.exists(assemblies_dir + output_prefix + "Failed-assemblies.tsv"):
-        assembly_files = [file_prefix + output_prefix + "assembly-summaries.tsv", file_prefix + output_prefix + "Failed-assemblies.tsv"]
+    if os.path.exists(assemblies_dir + output_prefix + f"Failed-assemblies_{assay_suffix}.tsv"):
+        assembly_files = [file_prefix + output_prefix + f"assembly-summaries_{assay_suffix}.tsv", file_prefix + output_prefix + f"Failed-assemblies_{assay_suffix}.tsv"]
     else:
-        assembly_files = [file_prefix + output_prefix + "assembly-summaries.tsv"]
+        assembly_files = [file_prefix + output_prefix + f"assembly-summaries_{assay_suffix}.tsv"]
 
-    if os.path.exists(bins_dir + output_prefix + "bins-overview.tsv"):
-        bins_overview = [file_prefix + output_prefix + "bins-overview.tsv"]
+    if os.path.exists(bins_dir + output_prefix + f"bins-overview_{assay_suffix}.tsv"):
+        bins_overview = [file_prefix + output_prefix + f"bins-overview_{assay_suffix}.tsv"]
         bins_dir_files = [file for file in os.listdir(bins_dir) if file.endswith(".fasta")]
     else:
         bins_overview = [""]
 
-    if os.path.exists(MAGs_dir + output_prefix + "MAGs-overview.tsv"):
-        MAGs_overview = [file_prefix + output_prefix + "MAGs-overview.tsv"]
+    if os.path.exists(MAGs_dir + output_prefix + f"MAGs-overview_{assay_suffix}.tsv"):
+        MAGs_overview = [file_prefix + output_prefix + f"MAGs-overview_{assay_suffix}.tsv"]
         MAGs_dir_files = [file for file in os.listdir(MAGs_dir) if file.endswith(".fasta")]
     else:
         MAGs_overview = [""]
 
     MAG_KO_files_list = []
-    if os.path.exists(MAGs_dir + output_prefix + "MAG-level-KO-annotations.tsv"):
-        MAG_KO_files_list.append(file_prefix + output_prefix + "MAG-level-KO-annotations.tsv")
-    if os.path.exists(MAGs_dir + output_prefix + "MAG-KEGG-Decoder-out.tsv"):
-        MAG_KO_files_list.append(file_prefix + output_prefix + "MAG-KEGG-Decoder-out.tsv")
-    if os.path.exists(MAGs_dir + output_prefix + "MAG-KEGG-Decoder-out.html"):
-        MAG_KO_files_list.append(file_prefix + output_prefix + "MAG-KEGG-Decoder-out.html")
+    if os.path.exists(MAGs_dir + output_prefix + f"MAG-level-KO-annotations_{assay_suffix}.tsv"):
+        MAG_KO_files_list.append(file_prefix + output_prefix + f"MAG-level-KO-annotations_{assay_suffix}.tsv")
+    if os.path.exists(MAGs_dir + output_prefix + f"MAG-KEGG-Decoder-out_{assay_suffix}.tsv"):
+        MAG_KO_files_list.append(file_prefix + output_prefix + f"MAG-KEGG-Decoder-out_{assay_suffix}.tsv")
+    if os.path.exists(MAGs_dir + output_prefix + f"MAG-KEGG-Decoder-out_{assay_suffix}.html"):
+        MAG_KO_files_list.append(file_prefix + output_prefix + f"MAG-KEGG-Decoder-out_{assay_suffix}.html")
 
 
-    combined_outputs = [file_prefix + output_prefix + "Combined-gene-level-KO-function-coverages.tsv", 
-                        file_prefix + output_prefix + "Combined-gene-level-KO-function-coverages-CPM.tsv",
-                        file_prefix + output_prefix + "Combined-gene-level-taxonomy-coverages.tsv", 
-                        file_prefix + output_prefix + "Combined-gene-level-taxonomy-coverages-CPM.tsv",
-                        file_prefix + output_prefix + "Combined-contig-level-taxonomy-coverages.tsv", 
-                        file_prefix + output_prefix + "Combined-contig-level-taxonomy-coverages-CPM.tsv"]
+    combined_outputs = [file_prefix + output_prefix + f"Combined-gene-level-KO-function-coverages_{assay_suffix}.tsv", 
+                        file_prefix + output_prefix + f"Combined-gene-level-KO-function-coverages-CPM_{assay_suffix}.tsv",
+                        file_prefix + output_prefix + f"Combined-gene-level-taxonomy-coverages_{assay_suffix}.tsv", 
+                        file_prefix + output_prefix + f"Combined-gene-level-taxonomy-coverages-CPM_{assay_suffix}.tsv",
+                        file_prefix + output_prefix + f"Combined-contig-level-taxonomy-coverages_{assay_suffix}.tsv", 
+                        file_prefix + output_prefix + f"Combined-contig-level-taxonomy-coverages-CPM_{assay_suffix}.tsv"]
 
-    read_based_outputs = [file_prefix + output_prefix + "Gene-families.tsv", 
-                          file_prefix + output_prefix + "Gene-families-grouped-by-taxa.tsv", 
-                          file_prefix + output_prefix + "Gene-families-cpm.tsv", 
-                          file_prefix + output_prefix + "Gene-families-KO-cpm.tsv",
-                          file_prefix + output_prefix + "Pathway-abundances.tsv", 
-                          file_prefix + output_prefix + "Pathway-abundances-grouped-by-taxa.tsv", 
-                          file_prefix + output_prefix + "Pathway-abundances-cpm.tsv", 
-                          file_prefix + output_prefix + "Pathway-coverages.tsv",
-                          file_prefix + output_prefix + "Pathway-coverages-grouped-by-taxa.tsv", 
-                          file_prefix + output_prefix + "Metaphlan-taxonomy.tsv"]
+    read_based_outputs = [file_prefix + output_prefix + f"Gene-families_{assay_suffix}.tsv", 
+                          file_prefix + output_prefix + f"Gene-families-grouped-by-taxa_{assay_suffix}.tsv", 
+                          file_prefix + output_prefix + f"Gene-families-cpm_{assay_suffix}.tsv", 
+                          file_prefix + output_prefix + f"Gene-families-KO-cpm_{assay_suffix}.tsv",
+                          file_prefix + output_prefix + f"Pathway-abundances_{assay_suffix}.tsv", 
+                          file_prefix + output_prefix + f"Pathway-abundances-grouped-by-taxa_{assay_suffix}.tsv", 
+                          file_prefix + output_prefix + f"Pathway-abundances-cpm_{assay_suffix}.tsv", 
+                          file_prefix + output_prefix + f"Pathway-coverages_{assay_suffix}.tsv",
+                          file_prefix + output_prefix + f"Pathway-coverages-grouped-by-taxa_{assay_suffix}.tsv", 
+                          file_prefix + output_prefix + f"Metaphlan-taxonomy_{assay_suffix}.tsv"]
 
     processing_info = file_prefix + output_prefix + "processing_info.zip"
 
@@ -604,12 +604,12 @@ def gen_and_write_out_metagenomics_filenames_table(unique_filename_prefixes, map
         if len(curr_read_mapping) == 0:
             curr_read_mapping = [""]
 
-        if bins_overview[0] == file_prefix + output_prefix + "bins-overview.tsv":
+        if bins_overview[0] == file_prefix + output_prefix + f"bins-overview_{assay_suffix}.tsv":
             curr_bins = bins_overview + [file_prefix + file for file in bins_dir_files if file.startswith(sample)]
         else:
             curr_bins = [""]
 
-        if MAGs_overview[0] == file_prefix + output_prefix + "MAGs-overview.tsv":
+        if MAGs_overview[0] == file_prefix + output_prefix + f"MAGs-overview_{assay_suffix}.tsv":
             curr_MAGs = MAGs_overview + [file_prefix + file for file in MAGs_dir_files if file.startswith(sample)] + MAG_KO_files_list
         else:
             curr_MAGs = [""]
