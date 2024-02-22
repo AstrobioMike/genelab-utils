@@ -56,6 +56,8 @@ parser.add_argument("--nodename", help = "Add this flag to specify slurm node to
 parser.add_argument("--exclude_nodename", help = "Add this flag to specify slurm nodes to exclude. This overrides any --nodename supplied.", action = "store", default = "")
 parser.add_argument("--queue", help = "Add this flag to specify slurm queue to use", action = "store", default = "normal")
 
+parser.add_argument("--unlock", help = "Add this flag if wanting to pass the '--unlock' argument to the snakemake call (may be needed if 'snakemake.log' file is saying there is a 'LockException')", action = "store_true")
+
 
 if len(sys.argv)==1:
     parser.print_help(sys.stderr)
@@ -336,6 +338,9 @@ def build_snakemake_call():
         snakemake_call.append(f"--jobs {jobs}")
         snakemake_call = " ".join(snakemake_call)
 
+    # adding unlock if argument was provided
+    if args.unlock:
+        snakemake_call.append("--unlock")
 
     return(snakemake_call)
 
