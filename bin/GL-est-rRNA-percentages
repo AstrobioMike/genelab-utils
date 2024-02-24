@@ -10,13 +10,14 @@ import argparse
 import textwrap
 import glob
 import subprocess
+import pathlib
 
 parser = argparse.ArgumentParser(description = "This is currently just an internal GeneLab helper program for estimating percentages \
                                                 of rRNA reads in fastq files for a few organisms. It screens against a primary organism and a few others. \
                                                 It is not currently written to work properly anywhere other than GeneLab's main cluster, and is not robust to \
                                                 things like varying file extensions (it is expected to have files already renamed in GL's convention). \
                                                 For help reach out to Mike. For version info, run `GL-version`.",
-                                 epilog="Ex. usage: GL-est-rRNA-percentages -s samples.txt --ref Mus-musculus --GLDS-ID GLDS-XXX --slurm\n")
+                                 epilog="Ex. usage: GL-est-rRNA-percentages -s samplex.txt --ref Mus-musculus --GLDS-ID GLDS-XXX --slurm\n")
 
 required = parser.add_argument_group('required arguments')
 
@@ -44,19 +45,20 @@ parser.add_argument("-j", "--jobs", help = "Number of jobs to run in parallel (d
 
 parser.add_argument("-i", "--input-reads-dir", help = "Directory holding input reads (default: current working directory)", action = "store", default = "", type = str)
 
-parser.add_argument("--reads-to-scan", help = "In the case with some datasets, e.g. spatial transcriptomics, one set of the paired-reads may be a barcode.\
+parser.add_argument("--reads-to-scan", help = "In the case with some datasets (e.g., spatial transcriptomics or some single-cell), only one file of reads might be biological, with the others being technical.\
                                               Use this argument to specify which we should actually scan. E.g., by adding '--reads-to-scan R2' to specify R2", default = "", action = "store",
-                                       choices = ["R1", "R2"])
+                                       choices = ["R1", "R2", "R3", "R4"])
+
+parser.add_argument("--num-read-files-per-sample", help = "In the case with some datasets (e.g., spatial transcriptomics or some single-cell), there may be 3 or 4 read-files per sample. Use this argument\
+                                                           when needed to tell the program that. E.g., by adding '--num-read-files-per-sample 4' to specify 4", default = 2, action = "store", type = int,
+                                       choices = [1, 2, 3, 4])
 
 parser.add_argument("--single-ended", help = "Add this flag if data are single-end sequencing", action = "store_true")
-parser.add_argument("--directRNAseq", help = "Add this flag if data are actually RNA sequences that have U's instead of T's", action = "store_true")
 
 parser.add_argument("--slurm", help = "Add this flag to submit the job through slurm", action = "store_true")
 parser.add_argument("--nodename", help = "Add this flag to specify slurm node to use", action = "store", default = "")
 parser.add_argument("--exclude_nodename", help = "Add this flag to specify slurm nodes to exclude. This overrides any --nodename supplied.", action = "store", default = "")
 parser.add_argument("--queue", help = "Add this flag to specify slurm queue to use", action = "store", default = "normal")
-
-parser.add_argument("--unlock", help = "Add this flag if wanting to pass the '--unlock' argument to the snakemake call (may be needed if 'snakemake.log' file is saying there is a 'LockException')", action = "store_true")
 
 
 if len(sys.argv)==1:
@@ -100,9 +102,11 @@ blurb_file = str(args.GLDS_ID) + "-estimate-rRNA-blurb.txt"
 ################################################################################
 
 def main():
-
+    
     ### pre-flight checks ###
-
+    if args.single_ended:
+        args.num_read_files_per_sample = 1
+    
     # checking reference variable, directory, and files exist as expected
     check_for_refs(expected_reference_dict)
 
@@ -229,9 +233,10 @@ def checking_inputs():
         all_input_files = glob.glob(input_read_path_and_glob_pattern)
 
         # checking number
-        if len(all_input_files) != len(samples_list) * 2:
+        if len(all_input_files) != len(samples_list) * args.num_read_files_per_sample:
 
-            report_message(f"The number of input read file(s) expected based on the input '{args.sample_names_file}' file is {len(samples_list) * 2}, but {len(all_input_files)} were detected.")
+            report_message(f"The number of input read-file(s) expected based on the input '{args.sample_names_file}' file is {len(samples_list) * 2}, but {len(all_input_files)} were detected.")
+            report_message("This is by default expecting 2 read-files per sample, if this is not the case, use the '--num-read-files-per-sample' argument. If doing so already, investigate the input sample-names file compared to the read-files present.")
             exit_message()
 
         # making list of all unique names from detected files
@@ -254,7 +259,7 @@ def checking_inputs():
         # checking number
         if len(all_input_files) != len(samples_list):
 
-            report_message(f"The number of input read file(s) expected based on the input '{args.sample_names_file}' file is {len(samples_list)}, but {len(all_input_files)} were detected.")
+            report_message(f"The number of input read-file(s) expected based on the input '{args.sample_names_file}' file, and because '--single-ended' was specified, is {len(samples_list)}, but {len(all_input_files)} were detected.")
             exit_message()
 
         # making list of all unique names from detected files
@@ -296,21 +301,32 @@ def build_snakemake_call():
 
     jobs = args.jobs
     sample_IDs_file = args.sample_names_file
-    input_reads_dir = args.input_reads_dir
     primary_target_ref = args.ref
     primary_target_ref_filename = expected_reference_dict[args.ref]
     ref_dir = os.environ['rRNA_refs']
     GLDS_ID = args.GLDS_ID
     single_ended = args.single_ended
-    directRNAseq = args.directRNAseq
+
+    if args.input_reads_dir == "":
+        input_reads_dir = pathlib.Path(os.getcwd())
+    else:
+        input_reads_dir = pathlib.Path(args.input_reads_dir)
+
+    # setting to single-end for passing to the workflow if --reads-to-scan was specified
+        # done down here so it doesn't intefere with trying to match up unique IDs to filenames done earlier
+    if args.reads_to_scan:
+        single_ended = True
 
     if args.reads_to_scan == "R1":
         expected_suffix = "_R1_raw.fastq.gz"
     elif args.reads_to_scan == "R2":
         expected_suffix = "_R2_raw.fastq.gz"
+    elif args.reads_to_scan == "R3":
+        expected_suffix = "_R3_raw.fastq.gz"
+    elif args.reads_to_scan == "R4":
+        expected_suffix = "_R4_raw.fastq.gz"
     else:
         expected_suffix = ""
-
 
     snakemake_call = ["snakemake",
                       f"--config",
@@ -323,7 +339,6 @@ def build_snakemake_call():
                       f"single_ended={single_ended}",
                       f"expected_suffix={expected_suffix}",
                       f"logs_dir=hts_SeqScreener_logs"]
-
 
     # pointing to slurm profile for this if '--slurm' was specified
     if args.slurm:
@@ -338,9 +353,6 @@ def build_snakemake_call():
         snakemake_call.append(f"--jobs {jobs}")
         snakemake_call = " ".join(snakemake_call)
 
-    # adding unlock if argument was provided
-    if args.unlock:
-        snakemake_call.append("--unlock")
 
     return(snakemake_call)
 
@@ -370,48 +382,25 @@ def write_blurb():
 
     # getting version of htstream (the programs all give 1.3.2, but the installed conda version is 1.3.3, so getting that with this mess)
     htstream_version = subprocess.check_output('conda list | grep htstream | tr -s " " "\t" | cut -f 2', shell = True).decode('utf-8').strip()
-    
-    # writing out versions used to file, and processing blurb (which slightly varies if these were RNA sequences instead of cDNA)
-    if args.directRNAseq:
+    # writing out versions used to file
+    with open(blurb_file, "w") as out_file:
 
-        with open(blurb_file, "w") as out_file:
+        out_file.write(f"htstream v{htstream_version} utilized\n")
 
-            out_file.write(f"htstream v{htstream_version} utilized\n")
-
-            out_file.write("\nProtocol text:\n\n")
-            out_file.write(f"rRNA percentages of reads were estimated with the 'hts_SeqScreener' program of htstream v{htstream_version} screened against a fasta file of {args.ref} rRNA sequences retrieved from NCBI on {data_of_rRNA_refs_fetched}.\n")
-            out_file.write(f"Since 'hts_SeqScreener' does not deal with uracil bases, they were first changed to thymines in temporary files just for the sake of rRNA estimation - original files remain unchanged.\n\n")
-
-
-    else:
-        
-        with open(blurb_file, "w") as out_file:
-
-            out_file.write(f"htstream v{htstream_version} utilized\n")
-
-            out_file.write("\nProtocol text:\n\n")
-            out_file.write(f"rRNA percentages of reads were estimated with the 'hts_SeqScreener' program of htstream v{htstream_version} screened against a fasta file of {args.ref} rRNA sequences retrieved from NCBI on {data_of_rRNA_refs_fetched}.\n\n")
+        out_file.write("\nProtocol text:\n\n")
+        out_file.write(f"rRNA percentages of reads were estimated with the 'hts_SeqScreener' program of htstream v{htstream_version} screened against a fasta file of {args.ref} rRNA sequences retrieved from NCBI on {data_of_rRNA_refs_fetched}.\n\n")
 
 
 def write_snakefile(snakefile_text):
 
-    """
-    This creates the needed Snakefile based on the variables below. There
-    are two possible versions, one for if the input files are actual RNA sequencing, 
-    so they have U's instead of T's, and one where the input are DNA.
-
-    If there are U's, hts_SeqScreener can't deal with them. So we are converting U's to T's prior to running.
-    """
+    """ this creates the needed Snakefile based on the variable below """
 
     with open("Snakefile", "w") as out_file:
 
         out_file.write(snakefile_text)
 
 
-# this version is if data are RNA, and therefore have U's instead of T's
-if args.directRNAseq:
-
-    snakefile_text = '''
+snakefile_text = '''
 ####################################################################################################
 ## Snakefile for GeneLab for estimating percentages of rRNA in RNAseq datasets                    ##
 ## This is currently written for internal use only, and likely won't work as-is for non-GL folks  ##
@@ -445,217 +434,8 @@ if config["single_ended"] != True:
 
         rule hts_Seq_Screen:
             input:
-                R1 = config["input_reads_dir"] + "{ID}_R1_raw.fastq.gz",
-                R2 = config["input_reads_dir"] + "{ID}_R2_raw.fastq.gz"
-
-            params:
-                temp_R1 = config["input_reads_dir"] + "{ID}_R1_raw-U-to-T.temp.fastq",
-                temp_R2 = config["input_reads_dir"] + "{ID}_R2_raw-U-to-T.temp.fastq"
-
-            output:
-                json_log = logs_dir + "/{ID}-rRNA-screen.log"
-
-            shell:
-                """
-                # decompressing and converting U's to T's
-                zcat {input.R1} | tr "U" "T" > {params.temp_R1}
-                zcat {input.R2} | tr "U" "T" > {params.temp_R2}
-
-                hts_SeqScreener -1 {params.temp_R1} -2 {params.temp_R2} -C -r -L {output.json_log} \
-                    | hts_SeqScreener -s {primary_target_ref_path} -C -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -C -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -C -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -C -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -C -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -C -r -A {output.json_log} > /dev/null
-
-                # removing intermediate files
-                rm {params.temp_R1} {params.temp_R2}
-                """
-
-    else:
-
-        rule hts_Seq_Screen:
-            input:
-                reads = config["input_reads_dir"] + "{ID}" + config["expected_suffix"]
-
-            params:
-                temp_reads = config["input_reads_dir"] + "{ID}-U-to-T.temp" + config["expected_suffix"] + ".fastq"
-
-            output:
-                json_log = logs_dir + "/{ID}-rRNA-screen.log"
-
-            shell:
-                """
-                # decompressing and converting U's to T's
-                zcat {input.reads} | tr "U" "T" > {params.temp_reads}
-
-                hts_SeqScreener -U {params.temp_reads} -r -L {output.json_log} \
-                    | hts_SeqScreener -s {primary_target_ref_path} -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -r -A {output.json_log} \
-                    | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -r -A {output.json_log} > /dev/null
-
-                # removing intermediate file
-                rm {params.temp_reads}
-                """
-
-else:
-
-    rule hts_Seq_Screen:
-        input:
-            reads = config["input_reads_dir"] + "{ID}_raw.fastq.gz"
-
-        params:
-            temp_reads = config["input_reads_dir"] + "{ID}_raw-U-to-T.temp.fastq"
-
-        output:
-            json_log = logs_dir + "/{ID}-rRNA-screen.log"
-
-        shell:
-            """
-            # decompressing and converting U's to T's
-            zcat {input.reads} | tr "U" "T" > {params.temp_reads}
-
-            hts_SeqScreener -U {params.temp_reads} -r -L {output.json_log} \
-                | hts_SeqScreener -s {primary_target_ref_path} -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -r -A {output.json_log} > /dev/null
-
-            # removing intermediate files
-            rm {params.temp_reads}
-            """
-
-
-rule combine_outputs:
-    input:
-        expand(logs_dir + "/{ID}-rRNA-screen.log", ID = sample_ID_list)
-
-    output:
-        out_file = config["GLDS_ID"] + "-estimated-rRNA-percentages.tsv"
-
-    run:
-        out_tab = make_tables(input)
-        out_tab.to_csv(output.out_file, sep = "\t", index = False)
-
-
-
-########################################
-############## Functions ###############
-########################################
-
-def make_tables(list_of_files):
-
-    """
-    this takes a list of input paths to the json log files, parses them and calculates percentages of hits
-    """
-
-    # starting empty list of rows we combine at end
-    list_of_rows = []
-
-    for input_file in list_of_files:
-
-        # reading in json log file
-        with open(input_file) as json_file:
-
-            log_json = json.load(json_file)
-
-        # getting sample ID
-        sample_name = log_json[0]["Program_details"]["options"]["stats-file"].replace("-rRNA-screen.log", "").replace(logs_dir, "").replace("/", "")
-
-        # getting number of reads in sample
-        num_sample_total_reads = log_json[0]["Fragment"]["in"]
-
-        # making dictionary to hold info for this sample
-        sample_dict = {"sample": sample_name, "num_reads": num_sample_total_reads}
-
-        # getting the hits to each target ref
-        for element in log_json:
-
-            # getting target ref
-            if element["Program_details"]["options"].get("seq") is not None:
-
-                target_ref = os.path.basename(element["Program_details"]["options"]["seq"]).replace(".fasta", "").replace("rrna-", "")
-
-            else:
-
-                target_ref = "phiX"
-
-            # getting hits
-            if config["single_ended"] == True or config["expected_suffix"]:
-
-                num_hits = element["Single_end"]["hits"]
-
-            else:
-
-                num_hits = element["Paired_end"]["hits"]
-
-
-            # getting percent of total
-            perc_hits = round(num_hits / num_sample_total_reads * 100, 2)
-
-            # adding to dictionary
-            sample_dict[f"perc_{target_ref}_rRNA_hits"] = perc_hits
-
-        # turning into dataframe (single row)
-        curr_tab = pd.DataFrame(sample_dict, index = [sample_name])
-
-        # combining with previous ones if any
-        list_of_rows.append(curr_tab)
-
-    # combining rows into one table
-    out_tab = pd.concat(list_of_rows)
-
-    # appending "-primary-target" to 4th column name
-    out_tab.rename(columns = {out_tab.columns[3]: out_tab.columns[3] + "-primary-target"}, inplace = True)
-
-    return(out_tab)
-'''
-
-# this version is if it is straight cDNA, and has no U's
-else:
-
-    snakefile_text = '''
-####################################################################################################
-## Snakefile for GeneLab for estimating percentages of rRNA in RNAseq datasets                    ##
-## This is currently written for internal use only, and likely won't work as-is for non-GL folks  ##
-## This Snakefile was generated by the genelab-utils `GL-est-rRNA-percentages` program            ##
-## For help contact Michael D. Lee (Mike.Lee@nasa.gov)                                            ##
-####################################################################################################
-
-import os
-import json
-import pandas as pd
-
-## reading samples into list and setting some variables from command-line parameters
-sample_ID_list = [line.strip() for line in open(config["sample_IDs_file"])]
-ref_dir = config["ref_dir"]
-primary_target_ref_filename = config["primary_target_ref_filename"]
-primary_target_ref_path = os.path.join(ref_dir, primary_target_ref_filename)
-logs_dir = config["logs_dir"]
-
-
-########################################
-############# Rules start ##############
-########################################
-
-rule all:
-    input:
-        config["GLDS_ID"] + "-estimated-rRNA-percentages.tsv"
-
-if config["single_ended"] != True:
-
-    if not config["expected_suffix"]:
-
-        rule hts_Seq_Screen:
-            input:
-                R1 = config["input_reads_dir"] + "{ID}_R1_raw.fastq.gz",
-                R2 = config["input_reads_dir"] + "{ID}_R2_raw.fastq.gz"
+                R1 = config["input_reads_dir"] + "/{ID}_R1_raw.fastq.gz",
+                R2 = config["input_reads_dir"] + "/{ID}_R2_raw.fastq.gz"
 
             output:
                 json_log = logs_dir + "/{ID}-rRNA-screen.log"
@@ -675,7 +455,7 @@ if config["single_ended"] != True:
 
         rule hts_Seq_Screen:
             input:
-                reads = config["input_reads_dir"] + "{ID}" + config["expected_suffix"]
+                reads = config["input_reads_dir"] + "/{ID}" + config["expected_suffix"]
 
             output:
                 json_log = logs_dir + "/{ID}-rRNA-screen.log"
@@ -695,7 +475,7 @@ else:
 
     rule hts_Seq_Screen:
         input:
-            reads = config["input_reads_dir"] + "{ID}_raw.fastq.gz"
+            reads = config["input_reads_dir"] + "/{ID}" + config["expected_suffix"]
 
         output:
             json_log = logs_dir + "/{ID}-rRNA-screen.log"
