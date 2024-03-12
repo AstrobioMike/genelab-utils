@@ -473,23 +473,44 @@ if config["single_ended"] != True:
 
 else:
 
-    rule hts_Seq_Screen:
-        input:
-            reads = config["input_reads_dir"] + "/{ID}" + config["expected_suffix"]
+    if not config["expected_suffix"]:
+        rule hts_Seq_Screen:
+            input:
+                reads = config["input_reads_dir"] + "/{ID}_raw.fastq.gz"
 
-        output:
-            json_log = logs_dir + "/{ID}-rRNA-screen.log"
+            output:
+                json_log = logs_dir + "/{ID}-rRNA-screen.log"
 
-        shell:
-            """
-            hts_SeqScreener -U {input.reads} -r -L {output.json_log} \
-                | hts_SeqScreener -s {primary_target_ref_path} -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -r -A {output.json_log} \
-                | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -r -A {output.json_log} > /dev/null
-            """
+            shell:
+                """
+                hts_SeqScreener -U {input.reads} -r -L {output.json_log} \
+                    | hts_SeqScreener -s {primary_target_ref_path} -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -r -A {output.json_log} > /dev/null
+                """
+
+    else:
+    
+        rule hts_Seq_Screen:
+            input:
+                reads = config["input_reads_dir"] + "/{ID}" + config["expected_suffix"]
+
+            output:
+                json_log = logs_dir + "/{ID}-rRNA-screen.log"
+
+            shell:
+                """
+                hts_SeqScreener -U {input.reads} -r -L {output.json_log} \
+                    | hts_SeqScreener -s {primary_target_ref_path} -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Hsapiens.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Escherichia.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Pseudomonas.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Staphylococcus.fasta -r -A {output.json_log} \
+                    | hts_SeqScreener -s {ref_dir}/rrna-Streptococcus.fasta -r -A {output.json_log} > /dev/null
+                """
 
 
 
