@@ -512,13 +512,13 @@ def gen_and_write_out_metagenomics_filenames_table(unique_filename_prefixes, map
 
     if os.path.exists(bins_dir + output_prefix + f"bins-overview_{assay_suffix}.tsv"):
         bins_overview = [file_prefix + output_prefix + f"bins-overview_{assay_suffix}.tsv"]
-        bins_dir_files = [file for file in os.listdir(bins_dir) if file.endswith(".fasta")]
+        bins_zip_files = [file for file in os.listdir(bins_dir) if file.endswith(".zip")]
     else:
         bins_overview = [""]
 
     if os.path.exists(MAGs_dir + output_prefix + f"MAGs-overview_{assay_suffix}.tsv"):
         MAGs_overview = [file_prefix + output_prefix + f"MAGs-overview_{assay_suffix}.tsv"]
-        MAGs_dir_files = [file for file in os.listdir(MAGs_dir) if file.endswith(".fasta")]
+        MAGs_zip_files = [file for file in os.listdir(MAGs_dir) if file.endswith(".zip")]
     else:
         MAGs_overview = [""]
 
@@ -605,12 +605,12 @@ def gen_and_write_out_metagenomics_filenames_table(unique_filename_prefixes, map
             curr_read_mapping = [""]
 
         if bins_overview[0] == file_prefix + output_prefix + f"bins-overview_{assay_suffix}.tsv":
-            curr_bins = bins_overview + [file_prefix + file for file in bins_dir_files if file.startswith(sample)]
+            curr_bins = bins_overview + [file_prefix + file for file in bins_zip_files if file.startswith(sample)]
         else:
             curr_bins = [""]
 
         if MAGs_overview[0] == file_prefix + output_prefix + f"MAGs-overview_{assay_suffix}.tsv":
-            curr_MAGs = MAGs_overview + [file_prefix + file for file in MAGs_dir_files if file.startswith(sample)] + MAG_KO_files_list
+            curr_MAGs = MAGs_overview + [file_prefix + file for file in MAGs_zip_files if file.startswith(sample)] + MAG_KO_files_list
         else:
             curr_MAGs = [""]
 
