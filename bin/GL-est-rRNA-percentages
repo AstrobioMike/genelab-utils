@@ -37,7 +37,8 @@ required.add_argument('--ref', help = "The primary target organism/clade",
                                                                     'Mycobacterium',
                                                                     'Pseudomonas',
                                                                     'Staphylococcus',
-                                                                    'Streptococcus'])
+                                                                    'Streptococcus', 
+                                                                    'Klebsiella'])
 
 parser.add_argument("-g", "--GLDS-ID", help = 'GLDS ID if there is one (e.g. "GLDS-480")', action = "store", default = "GLDS-XXX")
 
@@ -82,19 +83,14 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
                            "R-norvegicus": "rrna-Rnorvegicus.fasta",
                            "Streptococcus": "rrna-Streptococcus.fasta",
                            "L-heterotoma": "rrna-Lheterotoma.fasta",
-                           "L-boulardi": "rrna-Lboulardi.fasta"}
+                           "L-boulardi": "rrna-Lboulardi.fasta",
+                           "Klebsiella": "rrna-Klebsiella.fasta"}
 
 # setting date retrieved (will eventually need to adjust/efficiency-ize this as more are added)
-if args.ref == "Mycobacterium":
-    data_of_rRNA_refs_fetched = "20-Oct-2022"
-elif args.ref == "G-hirsutum":
-    data_of_rRNA_refs_fetched = "10-Apr-2023"
-elif args.ref == "L-heterotoma":
-    data_of_rRNA_refs_fetched = "14-Jun-2023"
-elif args.ref == "L-boulardi":
-    data_of_rRNA_refs_fetched = "19-Oct-2023"
+if args.ref == 'Klebsiella':
+    data_of_rRNA_refs_fetched = "11-Dec-2024"
 else:
-    data_of_rRNA_refs_fetched = "01-Sep-2021"
+    data_of_rRNA_refs_fetched = "13-May-2024"
 
 
 blurb_file = str(args.GLDS_ID) + "-estimate-rRNA-blurb.txt"
