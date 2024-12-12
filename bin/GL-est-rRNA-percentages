@@ -38,7 +38,8 @@ required.add_argument('--ref', help = "The primary target organism/clade",
                                                                     'Pseudomonas',
                                                                     'Staphylococcus',
                                                                     'Streptococcus', 
-                                                                    'Klebsiella'])
+                                                                    'Klebsiella',
+                                                                    'Burkholderia'])
 
 parser.add_argument("-g", "--GLDS-ID", help = 'GLDS ID if there is one (e.g. "GLDS-480")', action = "store", default = "GLDS-XXX")
 
@@ -84,11 +85,14 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
                            "Streptococcus": "rrna-Streptococcus.fasta",
                            "L-heterotoma": "rrna-Lheterotoma.fasta",
                            "L-boulardi": "rrna-Lboulardi.fasta",
-                           "Klebsiella": "rrna-Klebsiella.fasta"}
+                           "Klebsiella": "rrna-Klebsiella.fasta",
+                           "Burkholderia": "rrna-Burkholderia.fasta"}
 
 # setting date retrieved (will eventually need to adjust/efficiency-ize this as more are added)
 if args.ref == 'Klebsiella':
     data_of_rRNA_refs_fetched = "11-Dec-2024"
+elif args.ref == 'Burkholderia':
+    data_of_rRNA_refs_fetched = "21-Oct-2024"
 else:
     data_of_rRNA_refs_fetched = "13-May-2024"
 
