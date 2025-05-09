@@ -44,6 +44,7 @@ required.add_argument('--ref', help="The primary target organism/clade",
                                                               'Mycobacterium',
                                                               'Pseudomonas',
                                                               'R-norvegicus',
+                                                              'R-palustris',
                                                               'Saccahromyces',
                                                               'Salmonella',
                                                               'S-lycopersicum',
@@ -103,6 +104,7 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
                            "Mycobacterium": "rrna-Mycobacterium.fasta",
                            "Pseudomonas": "rrna-Pseudomonas.fasta",
                            "R-norvegicus": "rrna-Rnorvegicus.fasta",
+                           "R-palustris": "rrna-Rpalustris.fasta",
                            "Saccahromyces": "rrna-Saccharomyces.fasta",
                            "Salmonella": "rrna-Salmonella.fasta",
                            "S-lycopersicum": "rrna-Slycopersicum.fasta",
@@ -110,7 +112,7 @@ expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
                            "Streptococcus": "rrna-Streptococcus.fasta"}
 
 # setting date retrieved (will eventually need to adjust/efficiency-ize this as more are added)
-data_of_rRNA_refs_fetched = "24-April-2025"
+date_of_rRNA_refs_fetched = "09-May-2025"
 
 blurb_file = str(args.GLDS_ID) + "-estimate-rRNA-blurb.txt"
 
@@ -389,7 +391,7 @@ def write_blurb():
 
         out_file.write("\nProtocol text:\n\n")
         out_file.write(
-            f"rRNA percentages of reads were estimated with the 'hts_SeqScreener' program of htstream v{htstream_version} screened against a fasta file of {args.ref} rRNA sequences retrieved from NCBI on {data_of_rRNA_refs_fetched}.\n\n")
+            f"rRNA percentages of reads were estimated with the 'hts_SeqScreener' program of htstream v{htstream_version} screened against a fasta file of {args.ref} rRNA sequences retrieved from NCBI on {date_of_rRNA_refs_fetched}.\n\n")
 
 
 def write_snakefile(snake_txt):
