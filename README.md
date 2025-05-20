@@ -10,7 +10,7 @@ The genelab-utils package should be installed with conda/mamba. If you are not f
 ```bash
 conda install -c conda-forge -n base mamba
 
-mamba create -n genelab-utils -c conda-forge -c bioconda -c defaults -c astrobiomike genelab-utils
+mamba create -n genelab-utils -c conda-forge -c bioconda -c astrobiomike genelab-utils
 
 conda activate genelab-utils
 ```
