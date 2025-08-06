@@ -9,23 +9,18 @@ import os
 import argparse
 import textwrap
 import requests
-from requests_html import HTMLSession
-import zipfile
-from io import BytesIO
 import re
-import json
-from urllib.request import urlopen
 from packaging import version
 
-parser = argparse.ArgumentParser(description = "This is a helper program for downloading GeneLab workflows. For verison info run `GL-version`.",
+parser = argparse.ArgumentParser(description = "This is a helper program for downloading GeneLab workflows. For version info run `GL-version`.",
                                  epilog="Ex. usage: GL-get-workflow MG-Illumina\n")
 
 required = parser.add_argument_group('required arguments')
 
-required.add_argument('workflow', choices = ['MG-Illumina',
+required.add_argument('workflow', choices = ['MG-Illumina','MG-Illumina-NF',
                                            'MG-remove-human-reads',
                                            'MG-estimate-host-reads',
-                                           'Amplicon-Illumina',
+                                           'Amplicon-Illumina', 'Amplicon-Illumina-NF',
                                            'Amplicon-454-IonTorrent',
                                            'RNAseq',
                                            'MethylSeq'],
@@ -68,9 +63,11 @@ else:
 workflow_dict = {
 
     "MG-Illumina": { "basename": "SW_MGIllumina" },
+    "MG-Illumina-NF": { "basename": "NF_MGIllumina" },
     "MG-remove-human-reads": { "basename": "SW_MGRemoveHumanReads" },
     "MG-estimate-host-reads": { "basename": "SW_MGEstHostReads" },
     "Amplicon-Illumina": { "basename": "SW_AmpIllumina" },
+    "Amplicon-Illumina-NF": { "basename": "NF_AmpIllumina" },
     "Amplicon-454-IonTorrent": { "basename": "SW_Amp454IonTor" },
     "RNAseq": { "basename": "NF_RCP" },
     "MethylSeq": { "basename": "NF_MethylSeq" }
@@ -110,6 +107,19 @@ def report_message(message, color = "yellow"):
     wprint(color_text(message, color))
 
 
+def get_next_page(page):
+    return page if 'link' in page.headers and 'next' in page.headers.get('link') else None
+
+
+def get_links_from_releases_page(releases_data):
+    links = []
+
+    # accessing release page in json format and getting all links available
+    for item in releases_data.json():
+        links.append(item['html_url'])
+    return links
+
+
 def get_versions_available(target_wf):
 
     """ 
@@ -117,14 +127,21 @@ def get_versions_available(target_wf):
     and creates a dictionary holding the versions as keys and full workflow names as values.
     """
 
-    # accessing release page in json format
-    releases_data = json.loads(urlopen(releases_page_link).read())
-
+    # get first page
+    first_page = requests.request('GET', releases_page_link)
     # getting all links available
-    links = []
-    for item in releases_data:
-        links.append(item['html_url'])
+    links = get_links_from_releases_page(first_page)
 
+    next_page = first_page
+    while get_next_page(next_page) is not None:
+        try:
+            next_page_url = next_page.links['next']['url']
+            next_page = requests.request('GET', next_page_url)
+            links.extend(get_links_from_releases_page(next_page))
+        except KeyError:
+            "No more github pages"
+            break
+    
     # starting empty list of available versions
     available_versions = []
 
@@ -147,7 +164,7 @@ def get_versions_available(target_wf):
                 # adding to list
                 available_versions.append(link_version)
 
-                # adding to dictionary of verisons 
+                # adding to dictionary of versions 
                 dict_of_versions_and_basenames[link_version] = link_basename
 
 
