@@ -11,6 +11,35 @@ import textwrap
 import glob
 import subprocess
 import pathlib
+import json
+
+# expected references dict
+expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
+                           "Bacillus": "rrna-Bacillus.fasta",
+                           "B-distachyon": "rrna-Bdistachyon.fasta",
+                           "Burkholderia": "rrna-Burkholderia.fasta",
+                           "Candida": "rrna-Candida.fasta",
+                           "D-melanogaster": "rrna-Dmelanogaster.fasta",
+                           "D-rerio": "rrna-Drerio.fasta",
+                           "Escherichia": "rrna-Escherichia.fasta",
+                           "G-hirsutum": "rrna-Ghirsutum.fasta",
+                           "H-sapiens": "rrna-Hsapiens.fasta",
+                           "Klebsiella": "rrna-Klebsiella.fasta",
+                           "L-boulardi": "rrna-Lboulardi.fasta",
+                           "L-heterotoma": "rrna-Lheterotoma.fasta",
+                           "Mus-musculus": "rrna-Mmusculus.fasta",
+                           "Mycobacterium": "rrna-Mycobacterium.fasta",
+                           "Pseudomonas": "rrna-Pseudomonas.fasta",
+                           "R-norvegicus": "rrna-Rnorvegicus.fasta",
+                           "R-palustris": "rrna-Rpalustris.fasta",
+                           "Saccahromyces": "rrna-Saccharomyces.fasta",
+                           "Salmonella": "rrna-Salmonella.fasta",
+                           "S-lycopersicum": "rrna-Slycopersicum.fasta",
+                           "Staphylococcus": "rrna-Staphylococcus.fasta",
+                           "Streptococcus": "rrna-Streptococcus.fasta"}
+
+with open(pathlib.Path(os.path.dirname(__file__),'rRNA_references.json'), 'r') as ref_path:
+    expected_reference_dict = json.load(ref_path)
 
 parser = argparse.ArgumentParser(
     description="This is currently just an internal GeneLab helper program for estimating percentages \
@@ -18,7 +47,7 @@ parser = argparse.ArgumentParser(
                  It is not currently written to work properly anywhere other than GeneLab's main cluster, and is not robust to \
                  things like varying file extensions (it is expected to have files already renamed in GL's convention). \
                  For help reach out to Mike or Barbara. For version info, run `GL-version`.",
-    epilog="Ex. usage: GL-est-rRNA-percentages -s samplex.txt --ref Mus-musculus --GLDS-ID GLDS-XXX --slurm\n")
+    epilog="Ex. usage: GL-est-rRNA-percentages -s samples.txt --ref Mus-musculus --GLDS-ID GLDS-XXX --slurm\n")
 
 required = parser.add_argument_group('required arguments')
 
@@ -27,29 +56,7 @@ required.add_argument("-s", "--sample-names-file",
                       action="store", required=True)
 
 required.add_argument('--ref', help="The primary target organism/clade",
-                      action="store", required=True, choices=['A-thaliana',
-                                                              'Bacillus',
-                                                              'B-distachyon',
-                                                              'Burkholderia',
-                                                              'Candida',
-                                                              'D-melanogaster',
-                                                              'D-rerio',
-                                                              'Escherichia',
-                                                              'G-hirsutum',
-                                                              'H-sapiens',
-                                                              'Klebsiella',
-                                                              'L-boulardi',
-                                                              'L-heterotoma',
-                                                              'Mus-musculus',
-                                                              'Mycobacterium',
-                                                              'Pseudomonas',
-                                                              'R-norvegicus',
-                                                              'R-palustris',
-                                                              'Saccahromyces',
-                                                              'Salmonella',
-                                                              'S-lycopersicum',
-                                                              'Staphylococcus',
-                                                              'Streptococcus'])
+                      action="store", required=True, choices=expected_reference_dict.keys())
 
 parser.add_argument("-g", "--GLDS-ID", action="store", default="GLDS-XXX",
                     help='GLDS ID if there is one (e.g. "GLDS-480")')
@@ -86,33 +93,9 @@ if len(sys.argv) == 1:
 
 args = parser.parse_args()
 
-# expected references dict
-expected_reference_dict = {"A-thaliana": "rrna-Athaliana.fasta",
-                           "Bacillus": "rrna-Bacillus.fasta",
-                           "B-distachyon": "rrna-Bdistachyon.fasta",
-                           "Burkholderia": "rrna-Burkholderia.fasta",
-                           "Candida": "rrna-Candida.fasta",
-                           "D-melanogaster": "rrna-Dmelanogaster.fasta",
-                           "D-rerio": "rrna-Drerio.fasta",
-                           "Escherichia": "rrna-Escherichia.fasta",
-                           "G-hirsutum": "rrna-Ghirsutum.fasta",
-                           "H-sapiens": "rrna-Hsapiens.fasta",
-                           "Klebsiella": "rrna-Klebsiella.fasta",
-                           "L-boulardi": "rrna-Lboulardi.fasta",
-                           "L-heterotoma": "rrna-Lheterotoma.fasta",
-                           "Mus-musculus": "rrna-Mmusculus.fasta",
-                           "Mycobacterium": "rrna-Mycobacterium.fasta",
-                           "Pseudomonas": "rrna-Pseudomonas.fasta",
-                           "R-norvegicus": "rrna-Rnorvegicus.fasta",
-                           "R-palustris": "rrna-Rpalustris.fasta",
-                           "Saccahromyces": "rrna-Saccharomyces.fasta",
-                           "Salmonella": "rrna-Salmonella.fasta",
-                           "S-lycopersicum": "rrna-Slycopersicum.fasta",
-                           "Staphylococcus": "rrna-Staphylococcus.fasta",
-                           "Streptococcus": "rrna-Streptococcus.fasta"}
 
 # setting date retrieved (will eventually need to adjust/efficiency-ize this as more are added)
-date_of_rRNA_refs_fetched = "09-May-2025"
+date_of_rRNA_refs_fetched = "08-Jan-2026"
 
 blurb_file = str(args.GLDS_ID) + "-estimate-rRNA-blurb.txt"
 
@@ -191,6 +174,21 @@ def check_for_refs(expected_ref_dict):
     try:
 
         ref_dir = os.environ['rRNA_refs']
+        # making sure it holds a directory
+        if not os.path.isdir(ref_dir):
+            report_message(f"The system environment variable 'rRNA_refs' holds '{ref_dir}', but this doesn't seem to be a directory.")
+            exit_message()
+
+        # making sure all expected files are there
+        for file in expected_ref_dict.values():
+
+            ref_path = os.path.join(ref_dir, file)
+
+            if not os.path.exists(ref_path):
+                report_message(f"The 'rRNA_refs' directory doesn't seem to hold all expected reference files.")
+                print(f"\n  For example, here is one that's expected but missing:\n")
+                print(f"            {file}\n")
+                exit_message()
 
     except:
 
@@ -198,21 +196,6 @@ def check_for_refs(expected_ref_dict):
                        "directory containing the reference rRNA fasta files.")
         exit_message()
 
-    # making sure it holds a directory
-    if not os.path.isdir(ref_dir):
-        report_message(f"The system environment variable 'rRNA_refs' holds '{ref_dir}', but this doesn't seem to be a directory.")
-        exit_message()
-
-    # making sure all expected files are there
-    for file in expected_ref_dict.values():
-
-        ref_path = os.path.join(ref_dir, file)
-
-        if not os.path.exists(ref_path):
-            report_message(f"The 'rRNA_refs' directory doesn't seem to hold all expected reference files.")
-            print(f"\n  For example, here is one that's expected but missing:\n")
-            print(f"            {file}\n")
-            exit_message()
 
 
 def checking_inputs():
@@ -315,7 +298,7 @@ def build_snakemake_call():
         input_reads_dir = pathlib.Path(args.input_reads_dir)
 
     # setting to single-end for passing to the workflow if --reads-to-scan was specified
-    # done down here so it doesn't intefere with trying to match up unique IDs to filenames done earlier
+    # done down here so it doesn't interfere with trying to match up unique IDs to filenames done earlier
     if args.reads_to_scan:
         single_ended = True
 
